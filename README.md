@@ -1,2 +1,2 @@
 # slacq
-Repo for quench analysis
+Repo for LCLS-SC quench analysis

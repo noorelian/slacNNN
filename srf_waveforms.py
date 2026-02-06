@@ -10,7 +10,7 @@ common_waveforms = [
         ('DECAYREFWF', 'decay_reference'),
         ('ACQ_SAMP_PERIOD', 'sampling_period'),
     ]
-
+waveform_data = ['fault_waveform', 'forward_power', 'reverse_power', 'decay_reference']
 
 def load_faults(filename):
     """
@@ -85,7 +85,7 @@ def grab_waveforms(df):
     # After loop, grab timestamp and cavity info
     waveforms['cavity'] = df.iloc[0]['name']
     waveforms['timestamp'] = df.iloc[0]['timestamp']
-    
+
     return waveforms #return dictionary of waveforms
 
 def trim_waveform_data(waveform, threshold=None):
@@ -142,3 +142,9 @@ def convert_cavity_pv_name(raw_name):
             return formatted_name
         return 
     return raw_name
+
+def all_arrays_same_length(dictionary):
+    # Extract the lengths of all arrays using a generator expression
+    lengths = (len(arr) for arr in dictionary.values())
+    # Convert the lengths to a set to check if all are the same
+    return len(set(lengths)) == 1

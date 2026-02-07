@@ -11,33 +11,7 @@ false_wf = grab_waveforms(false_quenchdata)
 real_wf = grab_waveforms(real_quenchdata)
 #print(false_wf)
 
-def make_time_axis(wf):
-    """Create a time axis based on the sampling period 
-    and number of data points in the waveforms.
-    Check that all waveforms have the same length before creating the time axis.
 
-    Parameters: wf (dict): A dictionary of waveform data and sampling period.
-    Returns: np.array: An array representing the time axis for the waveforms.
-    """
-    if 'sampling_period' not in wf:
-        print("Error: Sampling period not found in waveforms dictionary.")
-        return None
-    
-    points = {}
-    sampling_period = wf['sampling_period']
-    for key in waveform_data:
-        print(key, wf[key])
-        points[key] = wf[key]
-    
-    # Check all keys have the same length
-    check = all_arrays_same_length(points)
-    if not check:
-        print("Error: Not all waveform arrays have the same length.")
-        return None
-
-    num_points_value = len(next(iter(points.values())))  # Get the length of the first array
-    time_axis = (np.arange(num_points_value)-num_points_value//2) * sampling_period
-    return time_axis
 
 
 # plot setup
@@ -58,19 +32,15 @@ def plot_all_waveforms(wf):
     plt.show()
 
 def plot_quench_waveforms(wf):
-    # grab the time axis for the waveforms
-    time_axis = make_time_axis(wf)
-    print("Time axis:", time_axis)
-    if time_axis is None:
-        print("Error: Time axis could not be created. Check waveform data and sampling period.")
-        return
+    trimmed = trim_waveform_dict(wf, derv_threshold=0.00015)
+    time_axis = trimmed['time_axis']
     # Plot quench waveform and decay reference only
-    if 'fault_waveform' in wf:
+    if 'fault_waveform' in trimmed:
         style = line_styles.get('fault_waveform', {})
-        plt.plot(time_axis, wf['fault_waveform'], label='Cavity fault waveform', **style)
-    if 'decay_reference' in wf:
+        plt.plot(time_axis, trimmed['fault_waveform'], label='Cavity fault waveform', **style)
+    if 'decay_reference' in trimmed:
         style = line_styles.get('decay_reference', {})
-        plt.plot(time_axis, wf['decay_reference'], label='Normal decay reference', **style)
+        plt.plot(time_axis, trimmed['decay_reference'], label='Normal decay reference', **style)
     return 
 
 def set_plot_labels(wf, timestamp=False):   
@@ -86,7 +56,7 @@ def set_plot_labels(wf, timestamp=False):
     plt.show()
 
 
-plt.figure(figsize=(14,6))
+plt.figure(figsize=(6,6))
 # Call the plotting functions
 plot_quench_waveforms(false_wf)
 #plot_quench_waveforms(real_wf)

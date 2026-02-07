@@ -60,13 +60,10 @@ def grab_waveforms(df):
     """
 
     waveforms = {}
-
     for name, key in common_waveforms:
-        print(name, key)
         # Check if row name matches the waveform names.
         # This should return only one row per waveform type.
         row = df[df['name'].str.endswith(name, na=False)]
-        print(row)
         if row.shape[0] == 0:
             print(f"Warning: No data found for waveform {name}")
             continue
@@ -88,10 +85,39 @@ def grab_waveforms(df):
 
     return waveforms #return dictionary of waveforms
 
-def trim_waveform_data(waveform, threshold=None):
+def make_time_axis(wf):
     """
-    Trim the waveform based on derivative of the waveform.
-    When the derivative falls below a certain threshold, we can assume the waveform has decayed to a stable state and trim the remaining data.
+    Create a time axis based on the sampling period 
+    and number of data points in the waveforms.
+    Check that all waveforms have the same length before creating the time axis.
+
+    Parameters: wf (dict): A dictionary of waveform data and sampling period.
+    Returns: np.array: An array representing the time axis for the waveforms.
+    """
+    if 'sampling_period' not in wf:
+        print("Error: Sampling period not found in waveforms dictionary.")
+        return None
+    
+    points = {}
+    sampling_period = wf['sampling_period']
+    for key in waveform_data:
+        print(key, wf[key])
+        points[key] = wf[key]
+    
+    # Check all keys have the same length
+    check = all_arrays_same_length(points)
+    if not check:
+        print("Error: Not all waveform arrays have the same length.")
+        return None
+
+    num_points_value = len(next(iter(points.values())))  # Get the length of the first array
+    time_axis = (np.arange(num_points_value)-num_points_value//2) * sampling_period
+    return time_axis
+
+def trim_waveform_data(waveform, derv_threshold=0.01):
+    """
+    Trim the waveform based on the derivative of the waveform.
+    When the derivative is near zero, we can assume the waveform has settled.
 
     Parameters:
     waveform (np.array): The input waveform data array.
@@ -99,27 +125,39 @@ def trim_waveform_data(waveform, threshold=None):
     Returns:
     np.array: The trimmed waveform data array.
     """
-    max_value = np.max(waveform)
-    min_value = np.min(waveform)
-    differences = np.abs(np.diff(waveform))
+    # Calculate the gradient (derivative)
+    gradient = np.gradient(waveform)
 
-    if threshold is None:
-        # Set a default threshold as 10% of the maximum value
-        threshold = 0.1 * np.max(waveform)
+    # Find indices where the absolute gradient is below the threshold (default 0.1%)
+    low_gradient_indices = np.where(np.abs(gradient) > derv_threshold)[0]
+    print("LOW", low_gradient_indices)
 
-    # Find indices where the absolute difference exceeds the threshold
-    significant_indices = np.where(np.abs(np.diff(waveform)) > threshold)[0]
+    # Handle case where all values are within the gradient threshold
+    if len(low_gradient_indices) == 0:
+        return waveform
 
-    if len(significant_indices) == 0:
-        print("Warning: No significant changes found in the waveform.")
-        return waveform  # Return original if no significant changes
+    # Get the first index where the gradient exceeds the threshold (start)
+    start_index = low_gradient_indices[0] + 1  # +1 to get the actual array index
 
-    # Trim the waveform to include only data up to the last significant change
-    last_significant_index = significant_indices[-1] + 1  # +1 to include the last point
-    trimmed_waveform = waveform[:last_significant_index]
+    # Get the last index where the gradient exceeds the threshold (end)
+    end_index = low_gradient_indices[-1] + 1    # +1 to include this index in the result
+    return start_index, end_index
 
-    return trimmed_waveform
+def trim_waveform_dict(waveforms, derv_threshold=0.01):
+    trimmed_waveforms = {}
+    # grab the time axis for the waveforms
+    time_axis   = make_time_axis(waveforms)
+    start, stop = trim_waveform_data(waveforms['fault_waveform'], derv_threshold)
+    print('START:', start, 'STOP:', stop)
+    # Time key is not in the waveform dict, add it here after trimming
+    trimmed_waveforms['time_axis'] = time_axis[start:stop]
 
+    for key in waveform_data:
+        if key in waveforms:
+            trimmed_waveforms[key] = waveforms[key][start:stop]
+        else:
+            print(f"Warning: {key} not found in waveforms dictionary, skipping trimming for this key.")
+    return trimmed_waveforms
 
 def convert_cavity_pv_name(raw_name):
     """

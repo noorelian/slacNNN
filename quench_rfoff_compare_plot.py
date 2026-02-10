@@ -33,14 +33,13 @@ def plot_all_waveforms(wf):
 
 def plot_quench_waveforms(wf):
     trimmed = trim_waveform_dict(wf, derv_threshold=0.00015)
-    time_axis = trimmed['time_axis']
     # Plot quench waveform and decay reference only
     if 'fault_waveform' in trimmed:
         style = line_styles.get('fault_waveform', {})
-        plt.plot(time_axis, trimmed['fault_waveform'], label='Cavity fault waveform', **style)
+        plt.plot(trimmed['fault_time'], trimmed['fault_waveform'], label='Cavity fault waveform', **style)
     if 'decay_reference' in trimmed:
         style = line_styles.get('decay_reference', {})
-        plt.plot(time_axis, trimmed['decay_reference'], label='Normal decay reference', **style)
+        plt.plot(trimmed['fault_time'], trimmed['decay_reference'], label='Normal decay reference', **style)
     return 
 
 def set_plot_labels(wf, timestamp=False):   

@@ -153,3 +153,20 @@ def all_arrays_same_length(dictionary):
     lengths = (len(arr) for arr in dictionary.values())
     # Convert the lengths to a set to check if all are the same
     return len(set(lengths)) == 1
+
+def read_h5_waveforms(filename):
+    """
+    Read waveform data from an HDF5 file and return it as a dictionary.
+
+    Parameters:
+    filename (str): Path to the HDF5 file containing waveform data.
+
+    Returns:
+    dict: A dictionary with waveform data arrays and metadata.
+    """
+    import h5py
+    waveforms = {}
+    with h5py.File(filename, 'r') as f:
+        for key in f.keys():
+            waveforms[key] = f[key][:]
+    return waveforms

@@ -13,7 +13,9 @@ common_waveforms = [
         ('REV:FLTTWF', 'reverse_time'),
         #('ACQ_SAMP_PERIOD', 'sampling_period'),
     ]
-waveform_data = [common_waveforms[i][1] for i in range(len(common_waveforms))] # list of keys for waveforms in the dictionary
+
+# list of keys for waveforms in the dictionary
+waveform_data = [common_waveforms[i][1] for i in range(len(common_waveforms))] 
 
 def load_faults(filename):
     """
@@ -55,7 +57,7 @@ def grab_waveforms(df):
     Extract forward, reverse, and reference waveforms from the Pandas DataFrame.
     There are multiple rows with CAV:FLTAWF, so skip rows that are not waveforms.
 
-    Parameters:
+    Params:
     df (pd.DataFrame): DataFrame containing waveform data.
 
     Returns:
@@ -64,7 +66,6 @@ def grab_waveforms(df):
 
     waveforms = {}
     for name, key in common_waveforms:
-        # Check if row name matches the waveform names.
         # This should return only one row per waveform type.
         row = df[df['name'].str.endswith(name, na=False)]
         if row.shape[0] == 0:
@@ -74,18 +75,15 @@ def grab_waveforms(df):
         #     waveforms[key] = row.iloc[0]['values'][0] # Store sampling period as a single value
         # Make sure only one waveform was found
         elif row.shape[0] == 1 and len(row.iloc[0]['values'])>1:
-            # Make sure waveform has more than one data points
             # TODO: confirm >1 assumptions are ok
             waveforms[key] = np.array(row.iloc[0]['values'])
         else:
             print(f"Warning: Data did not meet expected format for: {name}, skipping.")
             continue
         
-    # After loop, grab timestamp and cavity info
     waveforms['cavity'] = df.iloc[0]['name']
     waveforms['timestamp'] = df.iloc[0]['timestamp']
-
-    return waveforms #return dictionary of waveforms
+    return waveforms 
 
 def trim_single_waveform(waveform, derv_threshold=0.01):
     """
@@ -98,7 +96,7 @@ def trim_single_waveform(waveform, derv_threshold=0.01):
     Returns:
     np.array: The trimmed waveform data array.
     """
-    # Calculate the gradient (derivative)
+
     gradient = np.gradient(waveform)
 
     # Find indices where the absolute derivative is below the threshold (default 0.1%)
@@ -128,7 +126,7 @@ def trim_waveform_dict(waveforms, derv_threshold=0.01):
 
 def convert_cavity_pv_name(raw_name):
     """
-    Convert pv base cavity name to a more readable format.
+    Convert cavity name pv to a more readable format.
 
     Parameters:
     raw_name (str): Raw cavity name string.

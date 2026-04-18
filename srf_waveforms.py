@@ -19,7 +19,7 @@ waveform_data = [common_waveforms[i][1] for i in range(len(common_waveforms))]
 
 def load_faults(filename):
     """
-    Load SRF fault waveform data from a default text file.
+    Load SRF fault waveform data from one fault text file.
 
     Parameters:
     filename (str): Path to the text file containing waveform data.
@@ -36,7 +36,7 @@ def load_faults(filename):
             components = line.strip().split()
             if len(components) < 3:
                 # TODO: handle lines with insufficient data
-                continue  # skip lines with less than 3 components
+                continue  
             name = components[0]
             timestamp = components[1]
             try:
@@ -71,18 +71,17 @@ def grab_waveforms(df):
         if row.shape[0] == 0:
             print(f"Warning: No data found for waveform {name}")
             continue
-        # elif 'ACQ_SAMP_PERIOD' in name and row.shape[0] == 1:
-        #     waveforms[key] = row.iloc[0]['values'][0] # Store sampling period as a single value
-        # Make sure only one waveform was found
         elif row.shape[0] == 1 and len(row.iloc[0]['values'])>1:
             # TODO: confirm >1 assumptions are ok
             waveforms[key] = np.array(row.iloc[0]['values'])
         else:
             print(f"Warning: Data did not meet expected format for: {name}, skipping.")
             continue
-        
+    waveforms['cryomodule'] = df.iloc[0]['name'][:2] 
     waveforms['cavity'] = df.iloc[0]['name']
     waveforms['timestamp'] = df.iloc[0]['timestamp']
+    import pdb
+    pdb.set_trace()
     return waveforms 
 
 def trim_single_waveform(waveform, derv_threshold=0.01):
@@ -124,27 +123,28 @@ def trim_waveform_dict(waveforms, derv_threshold=0.01):
             print(f"Warning: {key} not found in waveforms dictionary, skipping trimming for this key.")
     return trimmed_waveforms
 
-def convert_cavity_pv_name(raw_name):
-    """
-    Convert cavity name pv to a more readable format.
-
-    Parameters:
-    raw_name (str): Raw cavity name string.
-
-    Returns:
-    str: Formatted cavity name for plots, etc.
-    """
-    pv_parts = raw_name.split(':')
-    if len(pv_parts) >= 3:
+def get_cm_cav_from_pv(pv_name):
+    pv_parts = pv_name.split(':')
+    try:
         # Assumes PV format ACCL:L3B:3180
-        if 'ACCL' in pv_parts[0]:
-            area    = pv_parts[1]
-            cav_num = pv_parts[2][2]
-            cm_num  = pv_parts[2][:2]
-            formatted_name = f"L3B: cryomodule {cm_num}, cavity {cav_num}"
-            return formatted_name
-        return 
-    return raw_name
+        area    = pv_parts[1]
+        cav_num = pv_parts[2][2]
+        cm_num  = pv_parts[2][:2]
+        return cm_num, cav_num
+    except Exception as e:
+        print(f"Error parsing PV name: {pv_name}. Exception: {e}")
+        return None, None
+
+def convert_pv_name_plot_string(raw_name):
+    """Make a cryomodule and cavity name for plots"""
+    cm, cav = get_cm_cav_from_pv(raw_name)
+    if cm and cav:
+        formatted_name = f"L3B: cryomodule {cm}, cavity {cav}"
+        return formatted_name
+    else:
+        print(f"Warning: Could not parse PV name: {raw_name}")
+        return raw_name
+
 
 def all_arrays_same_length(dictionary):
     # Check length of all arrays in the dictionary

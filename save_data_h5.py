@@ -6,7 +6,8 @@ import h5py
 import os
 from srf_waveforms import load_faults, grab_waveforms
 
-DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data"
+DATA_DIR = r"/Users/nneveu/Google Drive/My Drive/srf/q/"
+#DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data"
 LOADED_Q_CHANGE_FOR_QUENCH = 0.6 # fixed value to determine threshold
 
 def _get_cav_num(lx, cm):
@@ -33,16 +34,15 @@ def load_quench_files(quench_files):
     """Load quench files and return DataFrame of all quench waveforms."""
     quench_data = pd.DataFrame() 
     for filename in quench_files:
+        import pdb; pdb.set_trace() # for debugging
         df = load_faults(filename)
         waveforms = grab_waveforms(df)
-        waveforms['source_file'] = os.path.basename(filename)
         print(waveforms)
         quench_data = pd.concat([quench_data, waveforms])
-        import pdb; pdb.set_trace() # for debugging
     return quench_data
 
 # --- Main execution block ---
-for lx in range(0, 4): 
+for lx in range(3, 4): 
     # For each Lx section. 
     lx_dir = _get_lx_dir(lx)
     quench_files = _get_quench_filenames(lx_dir)

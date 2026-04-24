@@ -45,7 +45,12 @@ def load_faults(filename):
             timestamp = components[1]
             try:
                 values = [float(x) for x in components[2:]]
-                rows.append({"name": name, "timestamp": timestamp, "values": values})
+                rows.append({
+                    "name": name,
+                    "timestamp": timestamp,
+                    "values": values,
+                    "source_file": filename,
+                })
             except ValueError:
                 if 'CAL' in line:
                     # TODO: handle calibration timestamp lines skip for now

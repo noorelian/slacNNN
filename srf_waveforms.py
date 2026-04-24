@@ -14,12 +14,17 @@ common_waveforms = [
         #('ACQ_SAMP_PERIOD', 'sampling_period'),
     ]
 
-# list of keys for waveforms in the dictionary
-waveform_data = [common_waveforms[i][1] for i in range(len(common_waveforms))] 
+def grab_waveforms(df):
+    """
+    Extract forward, reverse, and reference waveforms from the Pandas DataFrame.
+    """
+    waveform_suffixes = [name for name, key in common_waveforms]
+    mask = df[df['name'].str.endswith(tuple(waveform_suffixes), na=False)]
+    return df[mask].reset_index(drop=True) 
 
 def load_faults(filename):
     """
-    Load SRF fault waveform data from one fault text file.
+    Load all SRF fault waveform data from one fault text file.
 
     Parameters:
     filename (str): Path to the text file containing waveform data.
@@ -52,48 +57,10 @@ def load_faults(filename):
     df = pd.DataFrame(rows)
     return df
 
-def grab_waveforms(df):
-    """
-    Extract forward, reverse, and reference waveforms from the Pandas DataFrame.
-    There are multiple rows with CAV:FLTAWF, so skip rows that are not waveforms.
-
-    Params:
-    df (pd.DataFrame): DataFrame containing waveform data.
-
-    Returns:
-    dict: A dictionary with extracted waveforms and timestamp.
-    """
-
-    waveforms = {}
-    for name, key in common_waveforms:
-        # This should return only one row per waveform type.
-        row = df[df['name'].str.endswith(name, na=False)]
-        if row.shape[0] == 0:
-            print(f"Warning: No data found for waveform {name}")
-            continue
-        elif row.shape[0] == 1 and len(row.iloc[0]['values'])>1:
-            # TODO: confirm >1 assumptions are ok
-            waveforms[key] = np.array(row.iloc[0]['values'])
-        else:
-            print(f"Warning: Data did not meet expected format for: {name}, skipping.")
-            continue
-    waveforms['cryomodule'] = df.iloc[0]['name'][:2] 
-    waveforms['cavity'] = df.iloc[0]['name']
-    waveforms['timestamp'] = df.iloc[0]['timestamp']
-    import pdb
-    pdb.set_trace()
-    return waveforms 
-
 def trim_single_waveform(waveform, derv_threshold=0.01):
     """
     Trim a single waveform based on the derivative of the waveform.
     When the derivative is near zero, we can assume the waveform has settled.
-
-    Parameters:
-    waveform (np.array): The input waveform data array.
-
-    Returns:
-    np.array: The trimmed waveform data array.
     """
 
     gradient = np.gradient(waveform)
@@ -123,7 +90,8 @@ def trim_waveform_dict(waveforms, derv_threshold=0.01):
             print(f"Warning: {key} not found in waveforms dictionary, skipping trimming for this key.")
     return trimmed_waveforms
 
-def get_cm_cav_from_pv(pv_name):
+def get_cm_cav_num_from_pv(pv_name):
+    """Get cryomodule and cavity number from PV."""
     pv_parts = pv_name.split(':')
     try:
         # Assumes PV format ACCL:L3B:3180
@@ -137,7 +105,7 @@ def get_cm_cav_from_pv(pv_name):
 
 def convert_pv_name_plot_string(raw_name):
     """Make a cryomodule and cavity name for plots"""
-    cm, cav = get_cm_cav_from_pv(raw_name)
+    cm, cav = get_cm_cav_num_from_pv(raw_name)
     if cm and cav:
         formatted_name = f"L3B: cryomodule {cm}, cavity {cav}"
         return formatted_name
@@ -168,3 +136,24 @@ def read_h5_waveforms(filename):
         for key in f.keys():
             waveforms[key] = f[key][:]
     return waveforms
+
+
+## OLD or delete? 
+# list of keys for waveforms in the dictionary
+# waveform_data = [common_waveforms[i][1] for i in range(len(common_waveforms))] 
+# def load_waveform_data(filename):
+#         with open(filename) as f:
+#         for line in f:
+#             components = line.strip().split()
+#             name = components[0]
+#             timestamp = components[1]
+#             # Check if any of the keys are in this line
+#             try:
+#                 values = [float(x) for x in components[2:]]
+#             except ValueError:
+#                 if 'CAL' in line:
+#                     # TODO: handle calibration timestamp lines skip for now
+#                     continue 
+#                 print(f"Warning: Skipping line due to conversion error: {line.strip()}")
+#                 continue  # skip lines with non-numeric values
+#             waveforms[key] = np.array(values)

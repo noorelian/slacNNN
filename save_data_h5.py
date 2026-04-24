@@ -45,7 +45,8 @@ for lx in range(0, 4):
     quench_files = _get_quench_filenames(lx_dir)
     #output_txt = f"quench_files_L{lx}.txt"
     #save_filenames_to_txt(quench_files, output_txt)
-    quench_data = load_quench_files(quench_files)
+    all_data  = load_quench_files(quench_files)
+    waveforms = grab_waveforms(all_data)
 
 
 # --- OLD ---

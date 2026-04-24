@@ -30,12 +30,14 @@ def save_filenames_to_txt(quench_files, output_txt):
             f.write(f"{os.path.basename(file)}\n")
 
 def load_quench_files(quench_files):
-    """Load quench files and put waveforms into a list of dictionaries."""
-    quench_data = []
+    """Load quench files and return DataFrame of all quench waveforms."""
+    quench_data = pd.DataFrame() 
     for filename in quench_files:
         df = load_faults(filename)
         waveforms = grab_waveforms(df)
-        quench_data.append(waveforms)
+        waveforms['source_file'] = os.path.basename(filename)
+        quench_data = pd.concat([quench_data, waveforms], ignore_index=True)
+        import pdb; pdb.set_trace() # for debugging
     return quench_data
 
 # --- Main execution block ---

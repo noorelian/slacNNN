@@ -14,13 +14,14 @@ common_waveforms = [
         #('ACQ_SAMP_PERIOD', 'sampling_period'),
     ]
 
+waveform_data = [key for _, key in common_waveforms]
+
 def grab_waveforms(df):
     """
     Extract forward, reverse, and reference waveforms from the Pandas DataFrame.
     """
     waveform_suffixes = [name for name, key in common_waveforms]
     mask = df['name'].str.endswith(tuple(waveform_suffixes), na=False)
-    import pdb; pdb.set_trace()  # Debugging breakpoint to inspect the DataFrame and mask
     return df[mask].reset_index(drop=True) 
 
 def load_faults(filename):

@@ -18,6 +18,7 @@ def grab_waveforms(df):
     """
     Extract forward, reverse, and reference waveforms from the Pandas DataFrame.
     """
+    import pdb; pdb.set_trace()  # Debugging breakpoint
     waveform_suffixes = [name for name, key in common_waveforms]
     mask = df[df['name'].str.endswith(tuple(waveform_suffixes), na=False)]
     return df[mask].reset_index(drop=True) 
@@ -25,9 +26,6 @@ def grab_waveforms(df):
 def load_faults(filename):
     """
     Load all SRF fault waveform data from one fault text file.
-
-    Parameters:
-    filename (str): Path to the text file containing waveform data.
 
     Returns:
     df (pd.DataFrame): a data frame containing time and waveform data arrays.

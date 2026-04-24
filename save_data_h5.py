@@ -34,11 +34,9 @@ def load_quench_files(quench_files):
     """Load quench files and return DataFrame of all quench waveforms."""
     quench_data = pd.DataFrame() 
     for filename in quench_files:
-        import pdb; pdb.set_trace() # for debugging
         df = load_faults(filename)
         waveforms = grab_waveforms(df)
-        print(waveforms)
-        quench_data = pd.concat([quench_data, waveforms])
+        quench_data = pd.concat([quench_data, waveforms], ignore_index=True)
     return quench_data
 
 # --- Main execution block ---
@@ -49,6 +47,7 @@ for lx in range(3, 4):
     #output_txt = f"quench_files_L{lx}.txt"
     #save_filenames_to_txt(quench_files, output_txt)
     all_data  = load_quench_files(quench_files)
+    import pdb; pdb.set_trace() # for debugging
 
 
 # # --- OLD ---

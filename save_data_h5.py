@@ -36,7 +36,8 @@ def load_quench_files(quench_files):
         df = load_faults(filename)
         waveforms = grab_waveforms(df)
         waveforms['source_file'] = os.path.basename(filename)
-        quench_data = pd.concat([quench_data, waveforms], ignore_index=True)
+        print(waveforms)
+        quench_data = pd.concat([quench_data, waveforms])
         import pdb; pdb.set_trace() # for debugging
     return quench_data
 

@@ -22,7 +22,7 @@ def grab_waveforms(df):
     """
     waveform_suffixes = [name for name, key in common_waveforms]
     mask = df['name'].str.endswith(tuple(waveform_suffixes), na=False)
-    return df[mask].reset_index(drop=True) 
+    return df[mask] 
 
 def load_faults(filename):
     """

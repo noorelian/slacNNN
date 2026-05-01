@@ -4,7 +4,7 @@ from datetime import datetime, time
 import pandas as pd
 import h5py
 import os
-from srf_waveforms import load_fault_file, grab_waveforms
+from srf_waveforms import load_fault_file, grab_common_waveforms, validate_quench_lisa
 
 DATA_DIR = r"/Users/nneveu/Google Drive/My Drive/srf/q/"
 #DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data"
@@ -36,7 +36,7 @@ def load_quench_data(quench_files):
     quench_data = pd.DataFrame() 
     for filename in quench_files:
         df = load_fault_file(filename)
-        waveforms   = grab_waveforms(df)
+        waveforms   = grab_common_waveforms(df)
         quench_data = pd.concat([quench_data, waveforms], ignore_index=True)
     return quench_data
 

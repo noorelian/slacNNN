@@ -11,12 +11,14 @@ common_waveforms = [
         ('CAV:FLTTWF', 'fault_time'),
         ('FWD:FLTTWF', 'forward_time'),
         ('REV:FLTTWF', 'reverse_time'),
+        (':QLOADED', 'q_loaded'),
+        (':FREQ', 'frequency'),
         #('ACQ_SAMP_PERIOD', 'sampling_period'),
     ]
 
 waveform_data = [key for _, key in common_waveforms]
 
-def grab_waveforms(df):
+def grab_common_waveforms(df):
     """
     Extract forward, reverse, and reference waveforms from the Pandas DataFrame.
     """
@@ -149,8 +151,7 @@ def read_h5_waveforms(filename):
             waveforms[key] = f[key][:]
     return waveforms
 
-def validate_quench_current(quench_data):
-    """Validate quench by checking if cavity amplitude drops below 0.002 MV."""
+def validate_quench_lisa(quench_data):
     #This is as close to copy paste as possible from Lisa's function:
     #def validate_quench(self, wait_for_update: bool = False):
     """
@@ -190,39 +191,16 @@ def validate_quench_current(quench_data):
     fault_data = fault_data[:end_decay]
     time_data = time_data[:end_decay]
     #TODO: See where Leila uploaded this
-    saved_loaded_q = self.current_q_loaded_pv_obj.get()
-
+    saved_loaded_q = quench_data["q_loaded"]
     pre_quench_amp = fault_data[0]
 
     exponential_term = np.polyfit(
         time_data, np.log(pre_quench_amp / fault_data), 1
     )[0]
     # TODO: see where leila uploaded frequency
-    loaded_q = (np.pi * self.frequency) / exponential_term
+    loaded_q = (np.pi * quench_data["frequency"]) / exponential_term
 
     thresh_for_quench = LOADED_Q_CHANGE_FOR_QUENCH * saved_loaded_q
     is_real = loaded_q < thresh_for_quench
-    print("Validation: ", is_real)
-
+    #print("Validation: ", is_real)
     return is_real
-
-
-## OLD or delete? 
-# list of keys for waveforms in the dictionary
-# waveform_data = [common_waveforms[i][1] for i in range(len(common_waveforms))] 
-# def load_waveform_data(filename):
-#         with open(filename) as f:
-#         for line in f:
-#             components = line.strip().split()
-#             name = components[0]
-#             timestamp = components[1]
-#             # Check if any of the keys are in this line
-#             try:
-#                 values = [float(x) for x in components[2:]]
-#             except ValueError:
-#                 if 'CAL' in line:
-#                     # TODO: handle calibration timestamp lines skip for now
-#                     continue 
-#                 print(f"Warning: Skipping line due to conversion error: {line.strip()}")
-#                 continue  # skip lines with non-numeric values
-#             waveforms[key] = np.array(values)

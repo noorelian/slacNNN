@@ -149,6 +149,63 @@ def read_h5_waveforms(filename):
             waveforms[key] = f[key][:]
     return waveforms
 
+def validate_quench_current(quench_data):
+    """Validate quench by checking if cavity amplitude drops below 0.002 MV."""
+    #This is as close to copy paste as possible from Lisa's function:
+    #def validate_quench(self, wait_for_update: bool = False):
+    """
+    Parsing the fault waveforms to calculate the loaded Q to try to determine
+    if a quench was real.
+    DERIVATION NOTES
+    A(t) = A0 * e^((-2 * pi * cav_freq * t)/(2 * loaded_Q)) = A0 * e ^ ((-pi * cav_freq * t)/loaded_Q)
+    ln(A(t)) = ln(A0) + ln(e ^ ((-pi * cav_freq * t)/loaded_Q)) = ln(A0) - ((pi * cav_freq * t)/loaded_Q)
+    polyfit(t, ln(A(t)), 1) = [-((pi * cav_freq)/loaded_Q), ln(A0)]
+    polyfit(t, ln(A0/A(t)), 1) = [(pi * f * t)/Ql]
+    https://education.molssi.org/python-data-analysis/03-data-fitting/index.html
+    :param wait_for_update: bool
+    :return: bool representing whether quench was real
+    """
+
+    LOADED_Q_CHANGE_FOR_QUENCH = 0.6
+
+    time_data = quench_data["fault_time"] 
+    fault_data = quench_data["fault_waveform"]
+    time_0 = 0
+
+    # Look for time 0 (quench). These waveforms capture data beforehand
+    for time_0, timestamp in enumerate(time_data):
+        if timestamp >= 0:
+            break
+
+    fault_data = fault_data[time_0:]
+    time_data = time_data[time_0:]
+
+    end_decay = len(fault_data) - 1
+
+    # Find where the amplitude decays to "zero"
+    for end_decay, amp in enumerate(fault_data):
+        if amp < 0.002:
+            break
+
+    fault_data = fault_data[:end_decay]
+    time_data = time_data[:end_decay]
+    #TODO: See where Leila uploaded this
+    saved_loaded_q = self.current_q_loaded_pv_obj.get()
+
+    pre_quench_amp = fault_data[0]
+
+    exponential_term = np.polyfit(
+        time_data, np.log(pre_quench_amp / fault_data), 1
+    )[0]
+    # TODO: see where leila uploaded frequency
+    loaded_q = (np.pi * self.frequency) / exponential_term
+
+    thresh_for_quench = LOADED_Q_CHANGE_FOR_QUENCH * saved_loaded_q
+    is_real = loaded_q < thresh_for_quench
+    print("Validation: ", is_real)
+
+    return is_real
+
 
 ## OLD or delete? 
 # list of keys for waveforms in the dictionary

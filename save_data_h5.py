@@ -1,6 +1,6 @@
 import numpy as np
 import glob
-from datetime import datetime
+from datetime import datetime, time
 import pandas as pd
 import h5py
 import os
@@ -39,30 +39,6 @@ def load_quench_data(quench_files):
         waveforms   = grab_waveforms(df)
         quench_data = pd.concat([quench_data, waveforms], ignore_index=True)
     return quench_data
-
-def validate_quench_current(quench_data):
-    """Validate quench by checking if cavity amplitude drops below 0.002 MV."""
-    #TODO: Grab lisa's and don't change it yet
-    return
-# def validate_quench(fault_data, time_data, saved_loaded_q, frequency):
-#     # ends the time closer to when the quench is over to eliminate when the amplitude=0
-#     end_decay = len(fault_data) - 1
-#     for end_decay, amp in enumerate(fault_data):
-#         if amp < 0.002:
-#             break
-    
-#     fault_data = fault_data[:end_decay]
-#     time_data = time_data[:end_decay]
-#     pre_quench_amp = fault_data[0]
-#     exponential_term = np.polyfit(time_data, np.log(pre_quench_amp / fault_data), 1)[0]
-#     loaded_q = (np.pi * frequency) / exponential_term
-
-#     thresh_for_quench = LOADED_Q_CHANGE_FOR_QUENCH * saved_loaded_q
-
-#     is_real = loaded_q < thresh_for_quench
-
-#     return saved_loaded_q, loaded_q, is_real
-
 
 # def _return_all_cm_data(all_data, cm):
 #     """Return all data for a given cryomodule."""

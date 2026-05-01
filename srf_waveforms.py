@@ -24,15 +24,16 @@ def grab_waveforms(df):
     mask = df['waveform'].str.endswith(tuple(waveform_suffixes), na=False)
     return df[mask] 
 
-def load_faults(filename):
+def load_fault_file(filename):
     """
-    Load all SRF fault waveform data from one fault text file.
+    Load all SRF fault waveform data from ONE fault text file.
 
     Returns:
     df (pd.DataFrame): a data frame containing time and waveform data arrays.
     """
     rows = []
     with open(filename) as f:
+        basefile = filename.split('/')[-1]
         for line in f:
             if line.startswith('#'):
                 # TODO: handle comment lines
@@ -40,26 +41,32 @@ def load_faults(filename):
             components = line.strip().split()
             if len(components) < 3:
                 # TODO: handle lines with insufficient data
-                continue  
+                continue 
+            if 'CAL' in line:
+                # TODO: handle calibration timestamp lines skip for now
+                continue 
+            if 'ACQ_FLT_TS' in line:
+                continue # TODO: handle acquisition timestamp lines 
+            
             name = components[0]
             timestamp = components[1]
+            cm_num, cav_num = get_cm_cav_num_from_pv(name)
+
             try:
                 values = [float(x) for x in components[2:]]
-                rows.append({
-                    "date": (filename.split('/')[-1]).split('_')[3:5],  # gives only the DATE component
-                    "waveform": name,
-                    "timestamp": timestamp,
-                    "values": values,
-                    "source_file": filename.split('/')[-1]  # just the filename without path,
-                    
-                })
             except ValueError:
-                if 'CAL' in line:
-                    # TODO: handle calibration timestamp lines skip for now
-                    continue 
                 print(f"Warning: Skipping line due to conversion error: {line.strip()}")
                 continue  # skip lines with non-numeric values
-
+                
+            rows.append({
+                "file_date": basefile.split('_')[3:5],  # gives only the DATE component
+                "waveform": name,
+                "cryomodule": cm_num,
+                "cavity": cav_num,
+                "timestamp": timestamp,
+                "values": values,
+                "source_file": basefile  # just the filename without path            
+            })
     df = pd.DataFrame(rows)
     return df
 
@@ -119,9 +126,8 @@ def convert_pv_name_plot_string(raw_name):
         print(f"Warning: Could not parse PV name: {raw_name}")
         return raw_name
 
-
 def all_arrays_same_length(dictionary):
-    # Check length of all arrays in the dictionary
+    """Check length of all arrays in the dictionary"""
     lengths = (len(arr) for arr in dictionary.values())
     # Convert the lengths to a set to check if all are the same
     return len(set(lengths)) == 1

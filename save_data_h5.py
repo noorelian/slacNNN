@@ -4,7 +4,7 @@ from datetime import datetime
 import pandas as pd
 import h5py
 import os
-from srf_waveforms import load_faults, grab_waveforms
+from srf_waveforms import load_fault_file, grab_waveforms
 
 DATA_DIR = r"/Users/nneveu/Google Drive/My Drive/srf/q/"
 #DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data"
@@ -19,8 +19,9 @@ def _get_lx_dir(lx):
     lnum = f"{lx:1d}"
     return os.path.join(DATA_DIR, f"ACCL_L{lnum}B_*")
 
-def _get_quench_filenames(lx_dir):
+def _get_quench_filenames(lx):
     """Get sorted quench files for Lx section."""
+    lx_dir = _get_lx_dir(lx)
     quench_files = glob.glob(os.path.join(lx_dir, '**', '*QUENCH.txt'), recursive=True)
     return sorted(quench_files)
 
@@ -30,37 +31,20 @@ def save_filenames_to_txt(quench_files, output_txt):
         for file in quench_files:
             f.write(f"{os.path.basename(file)}\n")
 
-def load_quench_files(quench_files):
+def load_quench_data(quench_files):
     """Load quench files and return DataFrame of all quench waveforms."""
     quench_data = pd.DataFrame() 
     for filename in quench_files:
-        df = load_faults(filename)
-        waveforms = grab_waveforms(df)
+        df = load_fault_file(filename)
+        waveforms   = grab_waveforms(df)
         quench_data = pd.concat([quench_data, waveforms], ignore_index=True)
     return quench_data
 
-# --- Main execution block ---
-for lx in range(3, 4): 
-    # For each Lx section. 
-    lx_dir = _get_lx_dir(lx)
-    quench_files = _get_quench_filenames(lx_dir)
-    #output_txt = f"quench_files_L{lx}.txt"
-    #save_filenames_to_txt(quench_files, output_txt)
-    all_data  = load_quench_files(quench_files)
-    import pdb; pdb.set_trace() # for debugging
-
-
-# # --- OLD ---
+def validate_quench_current(quench_data):
+    """Validate quench by checking if cavity amplitude drops below 0.002 MV."""
+    #TODO: Grab lisa's and don't change it yet
+    return
 # def validate_quench(fault_data, time_data, saved_loaded_q, frequency):
-#     # starts the time closer to when the quench happens to make the fit more accurate
-#     time_0 = 0
-#     for time_0, timestamp in enumerate(time_data):
-#         if timestamp >= 0:
-#             break
-    
-#     fault_data = fault_data[time_0:]
-#     time_data = time_data[time_0:]
-
 #     # ends the time closer to when the quench is over to eliminate when the amplitude=0
 #     end_decay = len(fault_data) - 1
 #     for end_decay, amp in enumerate(fault_data):
@@ -69,9 +53,7 @@ for lx in range(3, 4):
     
 #     fault_data = fault_data[:end_decay]
 #     time_data = time_data[:end_decay]
-
 #     pre_quench_amp = fault_data[0]
-
 #     exponential_term = np.polyfit(time_data, np.log(pre_quench_amp / fault_data), 1)[0]
 #     loaded_q = (np.pi * frequency) / exponential_term
 
@@ -80,6 +62,56 @@ for lx in range(3, 4):
 #     is_real = loaded_q < thresh_for_quench
 
 #     return saved_loaded_q, loaded_q, is_real
+
+
+# def _return_all_cm_data(all_data, cm):
+#     """Return all data for a given cryomodule."""
+#     return all_data[all_data['cryomodule'] == cm]
+
+ 
+# --- Main execution block ---
+for lx in range(3, 4): 
+    # For each Lx section
+    quench_files = _get_quench_filenames(lx)
+    #output_txt = f"quench_files_L{lx}.txt"
+    #save_filenames_to_txt(quench_files, output_txt)
+    all_data  = load_quench_data(quench_files)
+
+    with h5py.File(f"quench_data_L{lx}.h5", 'w') as h5file:
+        for cm in all_data['cryomodule'].unique():
+            cm_data    = all_data[all_data['cryomodule'] == cm]
+            group_name = f"CM{cm}"
+            cm_group   = h5file.require_group(group_name)
+            for cav in cm_data['cavity'].unique():
+                cav_data  = cm_data[cm_data['cavity'] == cav]
+                cav_group = cm_group.require_group(f"cavity{cav}")
+                for quench in cav_data['file_date'].unique():
+                    quench_data = cav_data[cav_data['file_date'] == quench]
+                    import pdb; pdb.set_trace() # for debugging
+                    for idx, row in quench_data.iterrows():
+                        timestamp = row['filedate'][0] + '_' + row['filedate'][1]
+                        quench_group = cav_group.create_group(timestamp)
+                        #quench_group.attrs['quench_classification'] = row['quench_classification']
+                        #quench_group.attrs['saved_q_value'] = row['saved_q_value']
+                        #quench_group.attrs['calculated_q_value'] = row['calculated_q_value']
+                        quench_group.create_dataset('time_seconds', data=row['time_seconds'])
+                        quench_group.create_dataset('cavity_amplitude_MV', data=row['cavity_amplitude_MV'])
+                        quench_group.create_dataset('forward_power_W2', data=row['forward_power_W2'])
+                        quench_group.create_dataset('reverse_power_W2', data=row['reverse_power_W2'])
+                        if 'decay_reference_MV' in row:
+                            quench_group.create_dataset('decay_reference_MV', data=row['decay_reference_MV'])
+                        else:
+                            print(f"Warning: decay_reference_MV not found for {timestamp} in CM{cm} cavity{cav}")
+
+                
+                import pdb; pdb.set_trace() # for debugging
+
+    #TODO: save all_data (Lx) to an HDF5 file for easier access in the future.
+    #TODO: save data by cryomodule, then by cavity, then by data. 
+    #TODO: use pandas indexing to access data by cryomodule and cavity number.
+
+# # --- OLD ---
+
 
 # # defining a function to imcrement the quench count
 # def increment_quench_count(group):

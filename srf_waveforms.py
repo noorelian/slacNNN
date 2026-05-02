@@ -17,13 +17,15 @@ common_waveforms = [
     ]
 
 waveform_data = [key for _, key in common_waveforms]
+by_label = {label: pv for pv, label in common_waveforms}
+
 
 def grab_common_waveforms(df):
     """
     Extract forward, reverse, and reference waveforms from the Pandas DataFrame.
     """
     waveform_suffixes = [name for name, key in common_waveforms]
-    mask = df['waveform'].str.endswith(tuple(waveform_suffixes), na=False)
+    mask = df['pvname'].str.endswith(tuple(waveform_suffixes), na=False)
     return df[mask] 
 
 def load_fault_file(filename):
@@ -61,16 +63,20 @@ def load_fault_file(filename):
                 continue  # skip lines with non-numeric values
                 
             rows.append({
-                "file_date": basefile.split('_')[3:5],  # gives only the DATE component
-                "waveform": name,
+                "file_date": make_timestamp_string(basefile),  # gives only the DATE component
+                "pvname": name,
                 "cryomodule": cm_num,
                 "cavity": cav_num,
-                "timestamp": timestamp,
+                "data_timestamp": timestamp,
                 "values": values,
                 "source_file": basefile  # just the filename without path            
             })
     df = pd.DataFrame(rows)
     return df
+
+def make_timestamp_string(basefile):
+    file_date = basefile.split('_')[3:5]
+    return f"{file_date[0]}_{file_date[1]}"
 
 def trim_single_waveform(waveform, derv_threshold=0.01):
     """
@@ -110,7 +116,6 @@ def get_cm_cav_num_from_pv(pv_name):
     pv_parts = pv_name.split(':')
     try:
         # Assumes PV format ACCL:L3B:3180
-        area    = pv_parts[1]
         cav_num = pv_parts[2][2]
         cm_num  = pv_parts[2][:2]
         return cm_num, cav_num
@@ -168,9 +173,17 @@ def validate_quench_lisa(quench_data):
     """
 
     LOADED_Q_CHANGE_FOR_QUENCH = 0.6
+    label_to_values = {
+    label: quench_data.loc[
+        quench_data["pvname"].str.endswith(pv_suffix, na=False),
+        "values",
+    ].iloc[0]
+    for pv_suffix, label in common_waveforms
+    if quench_data["pvname"].str.endswith(pv_suffix, na=False).any()
+    }
 
-    time_data = quench_data["fault_time"] 
-    fault_data = quench_data["fault_waveform"]
+    time_data = label_to_values["fault_time"] 
+    fault_data = label_to_values["fault_waveform"]
     time_0 = 0
 
     # Look for time 0 (quench). These waveforms capture data beforehand
@@ -189,16 +202,14 @@ def validate_quench_lisa(quench_data):
             break
 
     fault_data = fault_data[:end_decay]
-    time_data = time_data[:end_decay]
-    #TODO: See where Leila uploaded this
-    saved_loaded_q = quench_data["q_loaded"]
+    time_data  = time_data[:end_decay]
+    saved_loaded_q = label_to_values["q_loaded"]
     pre_quench_amp = fault_data[0]
 
     exponential_term = np.polyfit(
         time_data, np.log(pre_quench_amp / fault_data), 1
     )[0]
-    # TODO: see where leila uploaded frequency
-    loaded_q = (np.pi * quench_data["frequency"]) / exponential_term
+    loaded_q = (np.pi * label_to_values["frequency"]) / exponential_term
 
     thresh_for_quench = LOADED_Q_CHANGE_FOR_QUENCH * saved_loaded_q
     is_real = loaded_q < thresh_for_quench

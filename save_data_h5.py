@@ -40,6 +40,10 @@ def load_quench_data(quench_files):
         quench_data = pd.concat([quench_data, waveforms], ignore_index=True)
     return quench_data
 
+# def validation_check(quench_data):
+#     """Validate quench using Lisa's method and add classification to DataFrame."""
+#     return 
+
 # def _return_all_cm_data(all_data, cm):
 #     """Return all data for a given cryomodule."""
 #     return all_data[all_data['cryomodule'] == cm]
@@ -51,36 +55,34 @@ for lx in range(3, 4):
     quench_files = _get_quench_filenames(lx)
     #output_txt = f"quench_files_L{lx}.txt"
     #save_filenames_to_txt(quench_files, output_txt)
-    all_data  = load_quench_data(quench_files)
+    all_data  = load_quench_data(quench_files[:10])
 
     with h5py.File(f"quench_data_L{lx}.h5", 'w') as h5file:
-        for cm in all_data['cryomodule'].unique():
-            cm_data    = all_data[all_data['cryomodule'] == cm]
-            group_name = f"CM{cm}"
-            cm_group   = h5file.require_group(group_name)
-            for cav in cm_data['cavity'].unique():
-                cav_data  = cm_data[cm_data['cavity'] == cav]
-                cav_group = cm_group.require_group(f"cavity{cav}")
-                for quench in cav_data['file_date'].unique():
-                    quench_data = cav_data[cav_data['file_date'] == quench]
-                    import pdb; pdb.set_trace() # for debugging
-                    for idx, row in quench_data.iterrows():
-                        timestamp = row['filedate'][0] + '_' + row['filedate'][1]
-                        quench_group = cav_group.create_group(timestamp)
-                        #quench_group.attrs['quench_classification'] = row['quench_classification']
-                        #quench_group.attrs['saved_q_value'] = row['saved_q_value']
-                        #quench_group.attrs['calculated_q_value'] = row['calculated_q_value']
-                        quench_group.create_dataset('time_seconds', data=row['time_seconds'])
-                        quench_group.create_dataset('cavity_amplitude_MV', data=row['cavity_amplitude_MV'])
-                        quench_group.create_dataset('forward_power_W2', data=row['forward_power_W2'])
-                        quench_group.create_dataset('reverse_power_W2', data=row['reverse_power_W2'])
-                        if 'decay_reference_MV' in row:
-                            quench_group.create_dataset('decay_reference_MV', data=row['decay_reference_MV'])
-                        else:
-                            print(f"Warning: decay_reference_MV not found for {timestamp} in CM{cm} cavity{cav}")
-
-                
-                import pdb; pdb.set_trace() # for debugging
+        for (cm, cav), cav_data in all_data.groupby(["cryomodule", "cavity"], dropna=False):
+            
+            print(f"Processing CM{cm} CAV{cav}...")
+            cm_group     = h5file.require_group(f"CM{cm}")
+            cav_group    = cm_group.require_group(f"CAV{cav}")
+            quench_files = cav_data['source_file'].unique()
+            
+            print(f"Data for CM{cm} CAV{cav} has {len(quench_files)} quench events.")
+            for filename in quench_files:
+                quench_data = cav_data[cav_data['source_file'] == filename]
+                timestamp   = quench_data['file_date'].iloc[0]
+    
+                quench_group = cav_group.create_group(timestamp)
+                import pdb; pdb.set_trace()
+                quench_group.attrs['quench_classification'] = validate_quench_lisa(quench_data)
+                quench_group.attrs['q_loaded'] = cav_data['q_loaded']
+#                     #quench_group.attrs['calculated_q_value'] = row['calculated_q_value']
+#                     quench_group.create_dataset('time_seconds', data=row['time_seconds'])
+#                     quench_group.create_dataset('cavity_amplitude_MV', data=row['cavity_amplitude_MV'])
+#                     quench_group.create_dataset('forward_power_W2', data=row['forward_power_W2'])
+#                     quench_group.create_dataset('reverse_power_W2', data=row['reverse_power_W2'])
+#                     if 'decay_reference_MV' in row:
+#                         quench_group.create_dataset('decay_reference_MV', data=row['decay_reference_MV'])
+#                     else:
+#                         print(f"Warning: decay_reference_MV not found for {timestamp} in CM{cm} cavity{cav}")
 
     #TODO: save all_data (Lx) to an HDF5 file for easier access in the future.
     #TODO: save data by cryomodule, then by cavity, then by data. 

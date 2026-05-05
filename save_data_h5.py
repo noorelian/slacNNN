@@ -57,7 +57,7 @@ for lx in range(3, 4):
     #save_filenames_to_txt(quench_files, output_txt)
     all_data  = load_quench_data(quench_files[:10])
 
-    with h5py.File(f"quench_data_L{lx}.h5", 'w') as h5file:
+    with h5py.File(f"quench_data_L0-L3.h5", 'w') as h5file:
         for (cm, cav), cav_data in all_data.groupby(["cryomodule", "cavity"], dropna=False):
             
             print(f"Processing CM{cm} CAV{cav}...")
@@ -71,9 +71,9 @@ for lx in range(3, 4):
                 timestamp   = quench_data['file_date'].iloc[0]
     
                 quench_group = cav_group.create_group(timestamp)
-                import pdb; pdb.set_trace()
                 quench_group.attrs['quench_classification'] = validate_quench_lisa(quench_data)
                 quench_group.attrs['q_loaded'] = cav_data['q_loaded']
+                import pdb; pdb.set_trace()
 #                     #quench_group.attrs['calculated_q_value'] = row['calculated_q_value']
 #                     quench_group.create_dataset('time_seconds', data=row['time_seconds'])
 #                     quench_group.create_dataset('cavity_amplitude_MV', data=row['cavity_amplitude_MV'])

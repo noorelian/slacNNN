@@ -173,6 +173,7 @@ def validate_quench_lisa(quench_data):
     """
 
     LOADED_Q_CHANGE_FOR_QUENCH = 0.6
+
     label_to_values = {
     label: quench_data.loc[
         quench_data["pvname"].str.endswith(pv_suffix, na=False),
@@ -181,30 +182,34 @@ def validate_quench_lisa(quench_data):
     for pv_suffix, label in common_waveforms
     if quench_data["pvname"].str.endswith(pv_suffix, na=False).any()
     }
-
     time_data = label_to_values["fault_time"] 
     fault_data = label_to_values["fault_waveform"]
+    
     time_0 = 0
-
     # Look for time 0 (quench). These waveforms capture data beforehand
     for time_0, timestamp in enumerate(time_data):
         if timestamp >= 0:
             break
 
     fault_data = fault_data[time_0:]
-    time_data = time_data[time_0:]
-
-    end_decay = len(fault_data) - 1
+    time_data  = time_data[time_0:]
+    end_decay  = len(fault_data) - 1
 
     # Find where the amplitude decays to "zero"
     for end_decay, amp in enumerate(fault_data):
         if amp < 0.002:
             break
 
-    fault_data = fault_data[:end_decay]
+    if end_decay <= 1:
+        print("Warning: End of decay not found, using first data point.")
+        pre_quench_amp = fault_data[0]
+    else:
+        fault_data = fault_data[:end_decay]
+        pre_quench_amp = fault_data[0]
+
     time_data  = time_data[:end_decay]
     saved_loaded_q = label_to_values["q_loaded"]
-    pre_quench_amp = fault_data[0]
+    
 
     exponential_term = np.polyfit(
         time_data, np.log(pre_quench_amp / fault_data), 1

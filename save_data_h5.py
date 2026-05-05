@@ -32,18 +32,11 @@ def load_quench_data(quench_files):
         df = load_fault_file(filename)
         quench_data.append(grab_common_data(df))
     return pd.concat(quench_data, ignore_index=True)
-
-# def _return_all_cm_data(all_data, cm):
-#     """Return all data for a given cryomodule."""
-#     return all_data[all_data['cryomodule'] == cm]
-
  
 # --- Main execution block ---
-all_data = [] #pd.DataFrame()
+all_data = [] 
 for lx in range(4): 
-    # For each Lx section
     quench_files = _get_quench_filenames(lx)
-    #output_txt = f"quench_files_L{lx}.txt"
     #save_filenames_to_txt(quench_files, output_txt)
     all_data.append(load_quench_data(quench_files))
 all_data  = pd.concat(all_data, ignore_index=True)

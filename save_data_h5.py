@@ -1,18 +1,12 @@
 import numpy as np
 import glob
-from datetime import datetime, time
 import pandas as pd
 import h5py
 import os
-from srf_waveforms import load_fault_file, grab_common_waveforms, validate_quench_lisa
+from srf_waveforms import load_fault_file, grab_common_data, validate_quench_lisa, label_to_values
 
 DATA_DIR = r"/Users/nneveu/Google Drive/My Drive/srf/q/"
 #DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data"
-LOADED_Q_CHANGE_FOR_QUENCH = 0.6 # fixed value to determine threshold
-
-def _get_cav_num(lx, cm):
-    "Get cyromodule and cavity number."
-    return f"{lx:cm:02d}"
 
 def _get_lx_dir(lx): 
     """Get accelerating section, L0, L1, L2, or L3 directory."""
@@ -33,16 +27,12 @@ def save_filenames_to_txt(quench_files, output_txt):
 
 def load_quench_data(quench_files):
     """Load quench files and return DataFrame of all quench waveforms."""
-    quench_data = pd.DataFrame() 
+    quench_data = [] 
     for filename in quench_files:
         df = load_fault_file(filename)
-        waveforms   = grab_common_waveforms(df)
-        quench_data = pd.concat([quench_data, waveforms], ignore_index=True)
-    return quench_data
-
-# def validation_check(quench_data):
-#     """Validate quench using Lisa's method and add classification to DataFrame."""
-#     return 
+        waveforms   = grab_common_data(df)
+        quench_data.append(waveforms)
+    return pd.concat(quench_data, ignore_index=True)
 
 # def _return_all_cm_data(all_data, cm):
 #     """Return all data for a given cryomodule."""
@@ -50,61 +40,44 @@ def load_quench_data(quench_files):
 
  
 # --- Main execution block ---
-for lx in range(3, 4): 
+all_data = pd.DataFrame()
+for lx in range(4): 
     # For each Lx section
     quench_files = _get_quench_filenames(lx)
     #output_txt = f"quench_files_L{lx}.txt"
     #save_filenames_to_txt(quench_files, output_txt)
-    all_data  = load_quench_data(quench_files[:10])
+    all_data  = pd.concat([all_data, load_quench_data(quench_files[:20])], ignore_index=True)
 
-    with h5py.File(f"quench_data_L0-L3.h5", 'w') as h5file:
-        for (cm, cav), cav_data in all_data.groupby(["cryomodule", "cavity"], dropna=False):
-            
-            print(f"Processing CM{cm} CAV{cav}...")
-            cm_group     = h5file.require_group(f"CM{cm}")
-            cav_group    = cm_group.require_group(f"CAV{cav}")
-            quench_files = cav_data['source_file'].unique()
-            
-            print(f"Data for CM{cm} CAV{cav} has {len(quench_files)} quench events.")
-            for filename in quench_files:
-                quench_data = cav_data[cav_data['source_file'] == filename]
-                timestamp   = quench_data['file_date'].iloc[0]
-    
-                quench_group = cav_group.create_group(timestamp)
-                quench_group.attrs['quench_classification'] = validate_quench_lisa(quench_data)
-                quench_group.attrs['q_loaded'] = cav_data['q_loaded']
-                import pdb; pdb.set_trace()
-#                     #quench_group.attrs['calculated_q_value'] = row['calculated_q_value']
-#                     quench_group.create_dataset('time_seconds', data=row['time_seconds'])
-#                     quench_group.create_dataset('cavity_amplitude_MV', data=row['cavity_amplitude_MV'])
-#                     quench_group.create_dataset('forward_power_W2', data=row['forward_power_W2'])
-#                     quench_group.create_dataset('reverse_power_W2', data=row['reverse_power_W2'])
-#                     if 'decay_reference_MV' in row:
-#                         quench_group.create_dataset('decay_reference_MV', data=row['decay_reference_MV'])
-#                     else:
-#                         print(f"Warning: decay_reference_MV not found for {timestamp} in CM{cm} cavity{cav}")
+
+with h5py.File(f"quench_data_L0-L3.h5", 'w') as h5file:
+    for (cm, cav), cav_data in all_data.groupby(["cryomodule", "cavity"], dropna=False):
+        
+        print(f"Processing CM{cm} CAV{cav}...")
+        cm_group     = h5file.require_group(f"CM{int(cm)}")
+        cav_group    = cm_group.require_group(f"CAV{int(cav)}")
+        quench_files = cav_data['source_file'].unique()
+        
+        print(f"Data for CM{cm} CAV{cav} has {len(quench_files)} quench events.")
+        for filename in quench_files:
+            quench_data = cav_data[cav_data['source_file'] == filename]
+            timestamp   = quench_data['file_date'].iloc[0]
+
+            labeled_values = label_to_values(quench_data)
+            quench_group = cav_group.create_group(timestamp)
+            is_real, loaded_q = validate_quench_lisa(quench_data)
+            quench_group.attrs['quench_classification'] = is_real #boolean
+            quench_group.attrs['calculated_q_loaded']   = loaded_q
+            quench_group.attrs['saved_q_loaded']        = float(labeled_values["saved_q_loaded"])  
+
+            for label, values in labeled_values.items():
+                if isinstance(values, np.ndarray) and len(values)>1: # don't save freq and q again
+                    quench_group.create_dataset(label, data=values)
 
     #TODO: save all_data (Lx) to an HDF5 file for easier access in the future.
-    #TODO: save data by cryomodule, then by cavity, then by data. 
+    #TODO: save data by cryomodule, then by cavity, then by date. 
     #TODO: use pandas indexing to access data by cryomodule and cavity number.
 
 # # --- OLD ---
-
-
-# # defining a function to imcrement the quench count
-# def increment_quench_count(group):
-#     # if 'quench_count' already exists then we increment it
-#     # if it doesn't exist yet then we set the value to one
-#     if "quench_count" in group.attrs:   
-#         group.attrs["quench_count"] += 1
-#     else:
-#         group.attrs["quench_count"] = 1
-
-
-
-# # saving waveform and metadata to an HDF5 file
-# output_filename = f"quench_data_CM{CM_num}.h5"
-
 # # this block of code is for saving waveform data and metadata to an HDF45 File
 # with h5py.File(output_filename, 'w') as h5file: 
 #     for i, (filename, parts, timestamp_raw, timestamp_obj, file) in enumerate(quench_files):

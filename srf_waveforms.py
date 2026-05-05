@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 # Partial PVs to search for various waveforms
-common_waveforms = [
+common_data = [
         ('CAV:FLTAWF', 'fault_waveform'),
         ('FWD:FLTAWF', 'forward_power'),
         ('REV:FLTAWF', 'reverse_power'),
@@ -11,20 +11,20 @@ common_waveforms = [
         ('CAV:FLTTWF', 'fault_time'),
         ('FWD:FLTTWF', 'forward_time'),
         ('REV:FLTTWF', 'reverse_time'),
-        (':QLOADED', 'q_loaded'),
+        (':QLOADED', 'saved_q_loaded'),
         (':FREQ', 'frequency'),
         #('ACQ_SAMP_PERIOD', 'sampling_period'),
     ]
 
-waveform_data = [key for _, key in common_waveforms]
-by_label = {label: pv for pv, label in common_waveforms}
+waveform_data = [key for _, key in common_data]
+by_label = {label: pv for pv, label in common_data}
 
 
-def grab_common_waveforms(df):
+def grab_common_data(df):
     """
     Extract forward, reverse, and reference waveforms from the Pandas DataFrame.
     """
-    waveform_suffixes = [name for name, key in common_waveforms]
+    waveform_suffixes = [name for name, key in common_data]
     mask = df['pvname'].str.endswith(tuple(waveform_suffixes), na=False)
     return df[mask] 
 
@@ -63,10 +63,11 @@ def load_fault_file(filename):
                 continue  # skip lines with non-numeric values
                 
             rows.append({
-                "file_date": make_timestamp_string(basefile),  # gives only the DATE component
+                "file_date": make_timestamp_string(basefile),  # gives YEARMONTHDAY_HOURMINUTESECOND
                 "pvname": name,
                 "cryomodule": cm_num,
                 "cavity": cav_num,
+                "saved_q_loaded": values[0] if 'QLOADED' in name else None,  
                 "data_timestamp": timestamp,
                 "values": values,
                 "source_file": basefile  # just the filename without path            
@@ -139,6 +140,17 @@ def all_arrays_same_length(dictionary):
     # Convert the lengths to a set to check if all are the same
     return len(set(lengths)) == 1
 
+
+def label_to_values(quench_data):
+    return {
+    label: quench_data.loc[
+        quench_data["pvname"].str.endswith(pv_suffix, na=False),
+        "values",
+    ].iloc[0]
+    for pv_suffix, label in common_data
+    if quench_data["pvname"].str.endswith(pv_suffix, na=False).any()
+    }
+
 def read_h5_waveforms(filename):
     """
     Read waveform data from an HDF5 file and return it as a dictionary.
@@ -174,16 +186,11 @@ def validate_quench_lisa(quench_data):
 
     LOADED_Q_CHANGE_FOR_QUENCH = 0.6
 
-    label_to_values = {
-    label: quench_data.loc[
-        quench_data["pvname"].str.endswith(pv_suffix, na=False),
-        "values",
-    ].iloc[0]
-    for pv_suffix, label in common_waveforms
-    if quench_data["pvname"].str.endswith(pv_suffix, na=False).any()
-    }
-    time_data = label_to_values["fault_time"] 
-    fault_data = label_to_values["fault_waveform"]
+    labeled_values = label_to_values(quench_data)
+
+    time_data = np.array(labeled_values["fault_time"])
+    fault_data = np.array(labeled_values["fault_waveform"])
+    frequency = np.array(labeled_values["frequency"])
     
     time_0 = 0
     # Look for time 0 (quench). These waveforms capture data beforehand
@@ -201,22 +208,24 @@ def validate_quench_lisa(quench_data):
             break
 
     if end_decay <= 1:
-        print("Warning: End of decay not found, using first data point.")
+        print("Warning: End of decay not found, using all data points.")
+        fault_data = fault_data[:]
         pre_quench_amp = fault_data[0]
+        time_data  = time_data[:]
     else:
         fault_data = fault_data[:end_decay]
+        time_data  = time_data[:end_decay]
         pre_quench_amp = fault_data[0]
 
-    time_data  = time_data[:end_decay]
-    saved_loaded_q = label_to_values["q_loaded"]
-    
+    saved_loaded_q = float(labeled_values["saved_q_loaded"][0])
 
     exponential_term = np.polyfit(
         time_data, np.log(pre_quench_amp / fault_data), 1
     )[0]
-    loaded_q = (np.pi * label_to_values["frequency"]) / exponential_term
+    
+    loaded_q = (np.pi * frequency) / exponential_term
 
     thresh_for_quench = LOADED_Q_CHANGE_FOR_QUENCH * saved_loaded_q
     is_real = loaded_q < thresh_for_quench
     #print("Validation: ", is_real)
-    return is_real
+    return is_real, loaded_q

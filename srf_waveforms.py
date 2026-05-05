@@ -67,7 +67,6 @@ def load_fault_file(filename):
                 "pvname": name,
                 "cryomodule": cm_num,
                 "cavity": cav_num,
-                "saved_q_loaded": values[0] if 'QLOADED' in name else None,  
                 "data_timestamp": timestamp,
                 "values": values,
                 "source_file": basefile  # just the filename without path            

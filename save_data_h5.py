@@ -27,12 +27,12 @@ def save_filenames_to_txt(quench_files, output_txt):
 
 def load_quench_data(quench_files):
     """Load quench files and return DataFrame of all quench waveforms."""
-    quench_data = [] 
+    quench_data = pd.DataFrame() 
     for filename in quench_files:
         df = load_fault_file(filename)
         waveforms   = grab_common_data(df)
-        quench_data.append(waveforms)
-    return pd.concat(quench_data, ignore_index=True)
+        quench_data = pd.concat([quench_data, waveforms], ignore_index=True)
+    return quench_data
 
 # def _return_all_cm_data(all_data, cm):
 #     """Return all data for a given cryomodule."""
@@ -46,8 +46,7 @@ for lx in range(4):
     quench_files = _get_quench_filenames(lx)
     #output_txt = f"quench_files_L{lx}.txt"
     #save_filenames_to_txt(quench_files, output_txt)
-    all_data  = pd.concat([all_data, load_quench_data(quench_files[:20])], ignore_index=True)
-
+    all_data  = pd.concat([all_data, load_quench_data(quench_files)], ignore_index=True)
 
 with h5py.File(f"quench_data_L0-L3.h5", 'w') as h5file:
     for (cm, cav), cav_data in all_data.groupby(["cryomodule", "cavity"], dropna=False):
@@ -67,10 +66,10 @@ with h5py.File(f"quench_data_L0-L3.h5", 'w') as h5file:
             is_real, loaded_q = validate_quench_lisa(quench_data)
             quench_group.attrs['quench_classification'] = is_real #boolean
             quench_group.attrs['calculated_q_loaded']   = loaded_q
-            quench_group.attrs['saved_q_loaded']        = float(labeled_values["saved_q_loaded"])  
+            quench_group.attrs['saved_q_loaded']        = float(labeled_values["saved_q_loaded"][0])  
 
             for label, values in labeled_values.items():
-                if isinstance(values, np.ndarray) and len(values)>1: # don't save freq and q again
+                if len(values)>1: # don't save freq and q again
                     quench_group.create_dataset(label, data=values)
 
     #TODO: save all_data (Lx) to an HDF5 file for easier access in the future.

@@ -208,7 +208,7 @@ def validate_quench_lisa(quench_data):
             break
 
     if end_decay <= 1:
-        print("Warning: End of decay not found, using all data points.")
+        print(f"Warning: End of decay not found for {quench_data['source_file'].iloc[0]}, using all data points.")
         fault_data = fault_data[:]
         pre_quench_amp = fault_data[0]
         time_data  = time_data[:]

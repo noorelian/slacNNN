@@ -6,7 +6,7 @@ import os
 from srf_waveforms import load_fault_file, grab_common_data, validate_quench_lisa, label_to_values
 
 DATA_DIR = r"/Users/nneveu/Google Drive/My Drive/srf/q/"
-#DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data"
+#DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data/"
 
 def _get_lx_dir(lx): 
     """Get accelerating section, L0, L1, L2, or L3 directory."""
@@ -19,25 +19,26 @@ def _get_quench_filenames(lx):
     quench_files = glob.glob(os.path.join(lx_dir, '**', '*QUENCH.txt'), recursive=True)
     return sorted(quench_files)
 
-def save_filenames_to_txt(quench_files, output_txt):
-    """Save list of quench filenames to a text file."""
-    with open(output_txt, 'w') as f:
-        for file in quench_files:
-            f.write(f"{os.path.basename(file)}\n")
-
 def load_quench_data(quench_files):
     """Load quench files and return DataFrame of all quench waveforms."""
     quench_data = []
     for filename in quench_files:
         df = load_fault_file(filename)
         quench_data.append(grab_common_data(df))
-    return pd.concat(quench_data, ignore_index=True)
+    return pd.concat(quench_data, ignore_index=True) if quench_data else pd.DataFrame()
+
+def save_filenames_to_txt(quench_files, output_txt):
+    """Save list of quench filenames to a text file."""
+    with open(output_txt, 'w') as f:
+        for file in quench_files:
+            f.write(f"{os.path.basename(file)}\n")
  
 # --- Main execution block ---
 all_data = [] 
 for lx in range(4): 
     quench_files = _get_quench_filenames(lx)
     #save_filenames_to_txt(quench_files, output_txt)
+    print(f"L{lx}: found {len(quench_files)} quench files")
     all_data.append(load_quench_data(quench_files))
 all_data  = pd.concat(all_data, ignore_index=True)
 all_data.to_pickle(f"all_quench_data.pkl")

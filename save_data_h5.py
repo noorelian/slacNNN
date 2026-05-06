@@ -5,8 +5,13 @@ import h5py
 import os
 from srf_waveforms import load_fault_file, grab_common_data, validate_quench_lisa, label_to_values
 
-DATA_DIR = r"/Users/nneveu/Google Drive/My Drive/srf/q/"
-#DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data/"
+local = 0
+if local:
+    DATA_DIR = r"/Users/nneveu/Google Drive/My Drive/srf/q/"
+    savefile = "quench_data_L0-L3.h5"
+else:
+    DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data/"
+    savefile = "/sdf/group/ad/org/lfd/sclp/data/quench_data_L0-L3.h5"
 
 def _get_lx_dir(lx): 
     """Get accelerating section, L0, L1, L2, or L3 directory."""
@@ -41,9 +46,10 @@ for lx in range(4):
     print(f"L{lx}: found {len(quench_files)} quench files")
     all_data.append(load_quench_data(quench_files))
 all_data  = pd.concat(all_data, ignore_index=True)
-all_data.to_pickle(f"all_quench_data.pkl")
+#all_data.to_pickle(f"all_quench_data.pkl")
 
-with h5py.File(f"quench_data_L0-L3.h5", 'w') as h5file:
+
+with h5py.File(savefile, 'w') as h5file:
     for (cm, cav), cav_data in all_data.groupby(["cryomodule", "cavity"], dropna=False):
         
         print(f"Processing CM{cm} CAV{cav}...")

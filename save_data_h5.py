@@ -5,7 +5,7 @@ import h5py
 import os
 from srf_waveforms import load_fault_file, grab_common_data, validate_quench_lisa, label_to_values
 
-local = 0
+local = True
 if local:
     DATA_DIR = r"/Users/nneveu/Google Drive/My Drive/srf/q/"
     savefile = "quench_data_L0-L3.h5"

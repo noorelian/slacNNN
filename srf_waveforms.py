@@ -169,13 +169,16 @@ def validate_quench_lisa(quench_data):
 
     saved_loaded_q = float(labeled_values["saved_q_loaded"][0])
 
-    exponential_term = np.polyfit(
-        time_data, np.log(pre_quench_amp / fault_data), 1
-    )[0]
-    
-    loaded_q = (np.pi * frequency) / exponential_term
+    try:
+        with np.errstate(divide='raise', invalid='raise'):
+            log_ratio = np.log(pre_quench_amp / fault_data)
+            exponential_term = np.polyfit(time_data, log_ratio, 1)[0]
+            loaded_q = (np.pi * frequency) / exponential_term
+    except (FloatingPointError, ZeroDivisionError) as e:
+        print(f"Warning: divide-by-zero / invalid value in "
+              f"{quench_data['source_file'].iloc[0]}: {e}")
+        return False, np.nan
 
     thresh_for_quench = LOADED_Q_CHANGE_FOR_QUENCH * saved_loaded_q
     is_real = loaded_q < thresh_for_quench
-    #print("Validation: ", is_real)
     return is_real, loaded_q

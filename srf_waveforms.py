@@ -126,6 +126,7 @@ def validate_quench_lisa(quench_data):
     """
 
     LOADED_Q_CHANGE_FOR_QUENCH = 0.6
+    other = None
 
     labeled_values = label_to_values(quench_data)
     if 'frequency' not in labeled_values:
@@ -154,6 +155,7 @@ def validate_quench_lisa(quench_data):
 
     if end_decay <= 1:
         print(f"Warning: End of decay not found for {quench_data['source_file'].iloc[0]}, using all data points.")
+        other = "end_decay_not_found"
         fault_data = fault_data[:]
         pre_quench_amp = fault_data[0]
         time_data  = time_data[:]
@@ -172,8 +174,8 @@ def validate_quench_lisa(quench_data):
     except (FloatingPointError, ZeroDivisionError) as e:
         print(f"Warning: divide-by-zero / invalid value in "
               f"{quench_data['source_file'].iloc[0]}: {e}")
-        return False, np.nan
+        return {"is_real": False, "loaded_q": np.nan, 'other_issue': "divide_by_zero_or_invalid_value"}
 
     thresh_for_quench = LOADED_Q_CHANGE_FOR_QUENCH * saved_loaded_q
     is_real = loaded_q < thresh_for_quench
-    return is_real, loaded_q
+    return {"is_real": is_real, "loaded_q": loaded_q, 'other_issue': other}

@@ -65,12 +65,7 @@ def label_to_values(quench_data):
     }
 
 def load_fault_file(filename):
-    """
-    Load all SRF fault waveform data from ONE fault text file.
-
-    Returns:
-    df (pd.DataFrame): a data frame containing time and waveform data arrays.
-    """
+    """Load one SRF fault file into a DataFrame."""
     rows = []
     with open(filename) as f:
         basefile = filename.split('/')[-1]

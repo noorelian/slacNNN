@@ -3,7 +3,10 @@ import glob
 import pandas as pd
 import h5py
 import os
+import time
 from srf_waveforms import load_fault_file, grab_common_data, validate_quench_lisa, label_to_values
+
+start_time = time.time()
 
 local = True
 if local:
@@ -66,7 +69,7 @@ with h5py.File(savefile, 'w') as h5file:
             quench_result = validate_quench_lisa(quench_data)
             quench_group.attrs['quench_classification'] = quench_result['is_real'] #boolean
             quench_group.attrs['calculated_q_loaded']   = quench_result['loaded_q']
-            quench_group.attrs['other_issue']           = quench_result['other_issue']
+            quench_group.attrs['other_issue']           = str(quench_result['other_issue'])
 
             for label, values in labeled_values.items():
                 if len(values)>1: # don't save freq and q again
@@ -74,6 +77,7 @@ with h5py.File(savefile, 'w') as h5file:
                 elif label in ['frequency', 'saved_q_loaded']:
                     quench_group.attrs[label] = values[0] 
 
+print(f"Total runtime: {time.time() - start_time:.2f} seconds")
 # # --- OLD ---
 # # this block of code is for saving waveform data and metadata to an HDF45 File
 # with h5py.File(output_filename, 'w') as h5file: 

@@ -13,14 +13,13 @@ else:
     DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data/"
     savefile = "/sdf/group/ad/org/lfd/sclp/data/quench_data_L0-L3.h5"
 
-def _get_lx_dir(lx): 
-    """Get accelerating section, L0, L1, L2, or L3 directory."""
-    lnum = f"{lx:1d}"
-    return os.path.join(DATA_DIR, f"ACCL_L{lnum}B_*")
+def _get_lx_dir(area):
+    """Get accelerating area directory (e.g. 'L0B', 'L1B', 'H1B', 'H2B')."""
+    return os.path.join(DATA_DIR, f"ACCL_{area}_*")
 
-def _get_quench_filenames(lx):
-    """Get sorted quench files for Lx section."""
-    lx_dir = _get_lx_dir(lx)
+def _get_quench_filenames(area):
+    """Get sorted quench files for an area."""
+    lx_dir = _get_lx_dir(area)
     quench_files = glob.glob(os.path.join(lx_dir, '**', '*QUENCH.txt'), recursive=True)
     return sorted(quench_files)
 
@@ -40,14 +39,13 @@ def save_filenames_to_txt(quench_files, output_txt):
  
 # --- Main execution block ---
 all_data = [] 
-for lx in range(4): 
-    quench_files = _get_quench_filenames(lx)
+for area in ["L0B", "L1B", "L2B", "L3B", "H1B", "H2B"]:
+    quench_files = _get_quench_filenames(area)
     #save_filenames_to_txt(quench_files, output_txt)
-    print(f"L{lx}: found {len(quench_files)} quench files")
+    print(f"{area}: found {len(quench_files)} quench files")
     all_data.append(load_quench_data(quench_files))
 all_data  = pd.concat(all_data, ignore_index=True)
 #all_data.to_pickle(f"all_quench_data.pkl")
-
 
 with h5py.File(savefile, 'w') as h5file:
     for (cm, cav), cav_data in all_data.groupby(["cryomodule", "cavity"], dropna=False):
@@ -64,9 +62,10 @@ with h5py.File(savefile, 'w') as h5file:
 
             labeled_values = label_to_values(quench_data)
             quench_group = cav_group.create_group(timestamp)
-            is_real, loaded_q = validate_quench_lisa(quench_data)
-            quench_group.attrs['quench_classification'] = is_real #boolean
-            quench_group.attrs['calculated_q_loaded']   = loaded_q
+            quench_result = validate_quench_lisa(quench_data)
+            quench_group.attrs['quench_classification'] = quench_result['is_real'] #boolean
+            quench_group.attrs['calculated_q_loaded']   = quench_result['loaded_q']
+            quench_group.attrs['other_issue']           = quench_result['other_issue']
 
             for label, values in labeled_values.items():
                 if len(values)>1: # don't save freq and q again

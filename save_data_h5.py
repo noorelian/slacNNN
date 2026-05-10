@@ -8,13 +8,13 @@ from srf_waveforms import load_fault_file, grab_common_data, validate_quench_lis
 
 start_time = time.time()
 
-local = True
+local = False #True
 if local:
     DATA_DIR = r"/Users/nneveu/Google Drive/My Drive/srf/q/"
     SAVE_DIR = "."
 else:
     DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data/"
-    SAVE_DIR = "/sdf/group/ad/org/lfd/sclp/data"
+    SAVE_DIR = "/sdf/group/ad/org/lfd/sclp/data/"
 
 def _savefile_for_lx(lx):
     return os.path.join(SAVE_DIR, f"quench_data_L{lx}.h5")
@@ -54,7 +54,7 @@ def save_filenames_to_txt(quench_files, output_txt):
 # all_data  = pd.concat(all_data, ignore_index=True)
 # all_data.to_pickle(f"all_quench_data.pkl")
 
-all_data = pd.read_pickle("all_quench_data.pkl")
+all_data = pd.read_pickle(SAVE_DIR+"2026_all_quench_data.pkl")
 
 for lx in range(4):
     lx_tag = f"ACCL_L{lx}B_"

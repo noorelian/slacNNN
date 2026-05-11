@@ -45,6 +45,7 @@ def save_filenames_to_txt(quench_files, output_txt):
             f.write(f"{os.path.basename(file)}\n")
  
 # --- Main execution block ---
+#TODO: add option to either loop through files or use pkl file. 
 # all_data = [] 
 # for lx in range(4): 
 #     quench_files = _get_quench_filenames(lx)
@@ -94,13 +95,3 @@ for lx in range(4):
 
 print(f"Total runtime: {time.time() - start_time:.2f} seconds")
 
-        
-#         # getting PV and timestamp information from the file
-#         pv_base = parts[0] + ":" + parts[1] + ":" + parts[2]
-#         timestamp = timestamp_obj.strftime("%Y-%m-%d_%H:%M:%S.").replace('.','')
-#         timestamp = timestamp.split('_', 1)[-1] # gives only the HOUR:MINUTE:SECOND
-
-#         # formatting date components
-#         year = str(timestamp_obj.year)
-#         month = f"{timestamp_obj.month:02d}"
-#         day = f"{timestamp_obj.day:02d}"

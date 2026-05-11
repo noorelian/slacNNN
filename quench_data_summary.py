@@ -1,20 +1,15 @@
-"""Load quench events from quench_data_L*.h5 files into a flat DataFrame.
-
-The H5 files written by ``save_data_h5.py`` are the source of truth.
-``load_quench_events`` returns one row per quench event with these columns:
-
-    source_file  cm   cav   date  year  month  day  is_real
-"""
-
 import glob
 import os
 
 import h5py
 import pandas as pd
 
+# The H5 files written by ``save_data_h5.py`` are the source of truth.
+
 EVENT_COLS = ["source_file", "cm", "cav", "date", "year", "month", "day", "is_real"]
 
 def _events_from_h5(paths):
+    """Load quench events from quench_data_L*.h5 files into a flat DataFrame."""
     rows = []
     for path in paths:
         with h5py.File(path, "r") as f:
@@ -33,8 +28,9 @@ def _events_from_h5(paths):
 
 def load_quench_events(source):
     """Return a flat events DataFrame.
+    Returns one row per quench event with EVENT_COLS. 
 
-    Args: source: 
+    Source can be on of the following: 
           - a path to a single ``quench_data_L*.h5`` file
           - a list/tuple of such paths
           - a glob string like ``"quench_data_L*.h5"``

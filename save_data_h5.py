@@ -93,11 +93,7 @@ for lx in range(4):
                         quench_group.attrs[label] = values[0]
 
 print(f"Total runtime: {time.time() - start_time:.2f} seconds")
-# # --- OLD ---
-# # this block of code is for saving waveform data and metadata to an HDF45 File
-# with h5py.File(output_filename, 'w') as h5file: 
-#     for i, (filename, parts, timestamp_raw, timestamp_obj, file) in enumerate(quench_files):
-#         # print("\nProcessing file: " + file)
+
         
 #         # getting PV and timestamp information from the file
 #         pv_base = parts[0] + ":" + parts[1] + ":" + parts[2]
@@ -108,28 +104,3 @@ print(f"Total runtime: {time.time() - start_time:.2f} seconds")
 #         year = str(timestamp_obj.year)
 #         month = f"{timestamp_obj.month:02d}"
 #         day = f"{timestamp_obj.day:02d}"
-
-#         # GROUP HIERARCHY : CM# (HDF5 file) > CAV# > YEAR > MONTH > DAY > TIMESTAMP
-#         cavity = cavity_num.get(parts[2])               
-#         cavity_group = h5file.require_group(cavity)     # '.require_group()' only creates a group if it doesn't already exist
-#         increment_quench_count(cavity_group)            # if the group already exists then this line returns a reference to the existing group
-
-#         year_group = cavity_group.require_group(year) 
-#         increment_quench_count(year_group)              # incrementing the number of quenches at each level (cavity, year, month, etc)
-
-#         month_group = year_group.require_group(month)
-#         increment_quench_count(month_group)
-
-#         day_group = month_group.require_group(day)
-#         increment_quench_count(day_group)
-
-#         quench_group = day_group.create_group(timestamp)
-#         # using try-except statement to catch where fault_data[0] is 'None'
-#         # idea: file may be corrupt or waveform may be weird
-#         try:
-#             saved_loaded_q, calculated_q, classification = validate_quench(cavity_data, time_data, saved_loaded_q=q_data[0], frequency=1300000000.0)
-#             quench_group.attrs['quench_classification'] = classification
-#             quench_group.attrs['saved_q_value'] = saved_loaded_q
-#             quench_group.attrs['calculated_q_value'] = calculated_q
-#         except IndexError as e:
-#             print(f"Processing {filename} failed with {e}")

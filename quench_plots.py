@@ -64,31 +64,41 @@ def _finish(fig, save_path, show):
 
 def box_plot_quenches_per_cavity(events, classification=None, cryo_slice=None,
                                  ylim=(-10, 400), title=None,
+                                 annotate_totals=False,
                                  font_size=DEFAULT_FONT, figsize=(8, 6),
                                  save_path=None, show=False):
     """Box plot of per-cavity quench counts, one box per cryomodule.
 
     `cryo_slice` is a (start, stop) tuple to plot a subset of cryomodules
-    sorted alphabetically (e.g. (3, 8)). None = all.
+    in the order of ``events['cm']`` (e.g. (3, 8)). None = all.
     `classification` is 'real', 'fake', or None for no filtering.
+    `ylim` may be None for autoscale.
+    `annotate_totals` appends ``(n=<total>)`` to each x-tick label.
     """
     sub = _filter_class(events, classification) if classification else events
-    counts = (sub.groupby(["cm", "cav"]).size()
+    counts = (sub.groupby(["cm", "cav"], observed=True).size()
                  .unstack(fill_value=0))
-    cms = sorted(counts.index)
+    cms = counts.index.tolist()  # preserves Categorical order 
     if cryo_slice is not None:
         cms = cms[cryo_slice[0]:cryo_slice[1]]
     data = [counts.loc[cm].values for cm in cms]
 
     fig, ax = plt.subplots(figsize=figsize)
     ax.boxplot(data)
-    ax.set_ylim(*ylim)
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+
+    if annotate_totals:
+        labels = [f"{cm}\n(n={int(sum(d))})" for cm, d in zip(cms, data)]
+    else:
+        labels = cms
+
     label = _CLASS_LABEL[classification]
     _style(ax, "Cryomodule Number",
            f"Number of {label}Quenches per Cavity",
            title or f"{label}Quench Distributions per Cryomodule",
            font_size, xticks=np.arange(1, len(cms) + 1),
-           xticklabels=cms, rotation=45)
+           xticklabels=labels, rotation=45)
     _finish(fig, save_path, show)
 
 

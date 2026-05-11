@@ -47,6 +47,11 @@ should be followed unless the user says otherwise in a specific request.
 - Keep loader/adapter modules small; push aggregation into the call site.
 - When a plotting function would create a figure per loop iteration,
   that's a bug — create the figure once outside the loop.
+- Inline single-use helpers. If a private function (`_foo`) is called
+  from exactly one place and is only a thin wrapper around a few lines,
+  fold it back into its caller. Example: `_events_from_h5` was removed
+  once `_resolve_paths` existed because `load_quench_events` could do
+  the walk inline with no loss of clarity.
 
 ## Plotting conventions in this repo
 

@@ -39,54 +39,55 @@ Questions answered with these plots:
     (5) Which cavity quenched the most?
 """
 
-# Box plot: real quenches per cavity, cryomodules 4-8
+# # Box plot: real quenches per cavity, cryomodules 4-8
+# box_plot_quenches_per_cavity(
+#     events, classification="real", cryo_slice=(5, 10),
+#     save_path=os.path.join(IMG_DIR, "real_quench_distributions_per_cryo_4-8.png"),
+# )
+
 box_plot_quenches_per_cavity(
-    events, classification="real", cryo_slice=(5, 10),
-    save_path=os.path.join(IMG_DIR, "real_quench_distributions_per_cryo_4-8.png"),
+    events, #classification="real",
+    log=True, annotate_totals=True, compact_label=True,
+    section_dividers=True, font_size=20, figsize=(22, 7),
+    title="All Quench Distributions per Cryomodule (2022-2026)",
+    save_path=os.path.join(IMG_DIR, "all_quench_distributions_per_cryo_all.png"),
 )
 
-# Box plot: real quenches per cavity, all cryomodules, totals annotated
-box_plot_quenches_per_cavity(
-    events, classification="real",
-    ylim=None, annotate_totals=True, figsize=(22, 7),
-    title="Real Quench Distributions per Cryomodule (2022-2026)",
-    save_path=os.path.join(IMG_DIR, "real_quench_distributions_per_cryo_all.png"),
-)
+# # All quenches per cryomodule
+# bar_quenches_per_cryo(
+#     events, section_colors=True,
+#     title="Number of Quenches Per Cryomodule (2022-2026)",
+#     save_path=os.path.join(IMG_DIR, "all_quench_counts_per_cryo.png"),
+# )
 
-# All quenches per cryomodule
-bar_quenches_per_cryo(
-    events,
-    title="Number of Quenches Per Cryomodule (2022-2026)",
-    save_path=os.path.join(IMG_DIR, "all_quench_counts_per_cryo.png"),
-)
-
-# Real and fake stacked
-bar_real_vs_fake_stacked(
-    events,
-    title="Real vs Fake Quenches per Cryomodule (2022-2026)",
-    save_path=os.path.join(IMG_DIR, "real_vs_fake_quenches_stacked.png"),
-)
+# # Real and fake stacked
+# bar_real_vs_fake_stacked(
+#     events,
+#     title="Real vs Fake Quenches per Cryomodule (2022-2026)",
+#     save_path=os.path.join(IMG_DIR, "real_vs_fake_quenches_stacked.png"),
+# )
 
 # Real and fake grouped, log scale, subset 5-10
 bar_real_vs_fake_grouped(
-    events, cryo_slice=(7, 12), log=True,
-    title="Real vs Fake Quenches per Cryomodule on Log Scale (2022-2026)",
-    save_path=os.path.join(IMG_DIR, "real_vs_fake_quenches_log_scale.png"),
+    events, #cryo_slice=(7, 12), 
+    log=True,
+    title="Real vs False Quenches per Cryomodule on Log Scale (2022-2026)",
+    save_path=os.path.join(IMG_DIR, "real_vs_false_quenches_log_scale.png"),
 )
 
-# Real-only bar
-bar_quenches_per_cryo(
-    events, classification="real",
-    title="Real Quenches per Cryomodule (2022-2026)",
-    save_path=os.path.join(IMG_DIR, "real_quenches_per_cryo.png"),
-)
+# # Real-only bar
+# bar_quenches_per_cryo(
+#     events, classification="real", section_colors=True,
+#     title="Real Quenches per Cryomodule (2022-2026)",
+#     save_path=os.path.join(IMG_DIR, "real_quenches_per_cryo.png"),
+# )
 
-# Fake-only bar
-bar_quenches_per_cryo(
-    events, classification="fake",
-    title="Fake Quenches per Cryomodule (2022-2026)",
-    save_path=os.path.join(IMG_DIR, "fake_quenches_per_cryo.png"),
-)
+# # Fake-only bar
+# bar_quenches_per_cryo(
+#     events, classification="fake", section_colors=True,
+#     title="Fake Quenches per Cryomodule (2022-2026)",
+#     save_path=os.path.join(IMG_DIR, "fake_quenches_per_cryo.png"),
+# )
 
 # Pie chart
 pie_real_vs_fake(
@@ -104,17 +105,18 @@ pie_real_vs_fake(
 
 # All-years line plot
 line_quenches_all_years(
-    events, ylim=(0, 4000),
+    events, log=True,
+    font_size=17, figsize=(22, 7),
     save_path=os.path.join(IMG_DIR, "quenches_per_cryo_all_years.png"),
 )
 
-# Per-cavity bar for each cryomodule
-for cm in sorted(events["cm"].unique()):
-    bar_quenches_per_cavity(
-        events, cm,
-        title=f"Number of Quenches per Cavity in {cm} (2022-2026)",
-        save_path=os.path.join(IMG_DIR, f"quenches_per_cavity_{cm}.png"),
-    )
+# # Per-cavity bar for each cryomodule
+# for cm in sorted(events["cm"].unique()):
+#     bar_quenches_per_cavity(
+#         events, cm,
+#         title=f"Number of Quenches per Cavity in {cm} (2022-2026)",
+#         save_path=os.path.join(IMG_DIR, f"quenches_per_cavity_{cm}.png"),
+#     )
 
 
 

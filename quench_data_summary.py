@@ -8,6 +8,10 @@ import pandas as pd
 
 EVENT_COLS = ["source_file", "cm", "cav", "date", "year", "month", "day", "is_real"]
 
+MP = {'dates': [20241010, (20241012, 20241013, 20241014), 20241016, (20241012, 20241013, 20241014),20241007, (20241016, 20241017), (20241010, 20241011)],
+      'cms': ['CM16', 'CM20', 'CM22', 'CM24', 'CM26', 'CM27', 'CM29'],
+      'cavs': (1,7)
+      }
 
 def _resolve_paths(source):
     """Normalize a source spec to a sorted list of H5 file paths."""

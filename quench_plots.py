@@ -19,6 +19,14 @@ SECTIONS = [
     ("L3", [f"CM{n:02d}" for n in range(16, 36)], "#E69F00"),
 ]
 
+"""
+Questions answered with these plots:
+    (1) Which cryomodule quenched the most?
+    (2) How many real quenches per cryomodule?
+    (3) How many fake quenches per cryomodule?
+    (4) How many quenches per year?
+    (5) Which cavity quenched the most?
+"""
 
 def _section_for(cm):
     for name, members, color in SECTIONS:

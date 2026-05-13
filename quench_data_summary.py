@@ -75,6 +75,23 @@ def print_peak_quench_day_summary(events, top_n=3, real_only=True):
     return peak
 
 
+def peak_days_not_in_mp(peak, mp_events_df):
+    """Return rows of ``peak`` whose (cm, cav, year, month, day) does not
+    appear in ``mp_events_df``.
+
+    Useful for filtering peak-quench-day results down to days that were
+    not MP-processed.
+    """
+    keys = set(zip(mp_events_df["cm"], mp_events_df["cav"],
+                   mp_events_df["year"], mp_events_df["month"],
+                   mp_events_df["day"]))
+    mask = [(cm, cav, y, m, d) not in keys
+            for cm, cav, y, m, d in zip(peak["cm"], peak["cav"],
+                                        peak["year"], peak["month"],
+                                        peak["day"])]
+    return peak[mask].reset_index(drop=True)
+
+
 def _resolve_paths(source):
     """Normalize a source spec to a sorted list of H5 file paths."""
     if isinstance(source, str) and any(c in source for c in "*?["):

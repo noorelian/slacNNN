@@ -59,8 +59,8 @@ should be followed unless the user says otherwise in a specific request.
   `quench_data_summary.load_quench_events`, with columns
   ``source_file, cm, cav, date, year, month, day, is_real``.
 - Plot functions live in `quench_plots.py`. Each takes the events frame
-  (plus optional filters like `classification` ∈ {"all","real","fake"}
-  and `cryo_slice=(start, stop)`) and does its own aggregation.
+  (plus optional filters like `classification` ∈ {"all","real","false"}
+  and `cm_slice=(start, stop)`) and does its own aggregation.
 - Plot functions share the helpers `_filter_class`, `_annotate_bars`,
   `_style`, and `_finish`. New plots should reuse them.
 - `save_path=None` means "don't save"; passing a path writes PNG at

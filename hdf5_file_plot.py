@@ -3,6 +3,7 @@ import os
 from quench_data_summary import (
     load_quench_events,
     mp_events,
+    peak_days_not_in_mp,
     peak_quench_day_per_cavity,
     print_peak_quench_day_summary,
 )
@@ -37,14 +38,17 @@ present = [cm for cm in CM_ORDER if cm in set(events["cm"])]
 events["cm"] = pd.Categorical(events["cm"], categories=present, ordered=True)
 #print(events.groupby("cm", observed=True).size())
 
-real_events = events[events["is_real"].astype(bool)]
+real_events  = events[events["is_real"].astype(bool)]
 nompevents   = mp_events(real_events, keep=False)
 onlympevents = mp_events(real_events, keep=True)
 print(f"\nMP events: {len(onlympevents)}, non-MP events: {len(nompevents)}")
 
 #print_peak_quench_day_summary(real_events, top_n=3, real_only=True)
 peakdf    = peak_quench_day_per_cavity(real_events, top_n=3, real_only=True)
-cm20_2022 = real_events[(real_events["cm"] == "CM20") & (real_events["year"] == "2022")]
+#cm20_2022 = real_events[(real_events["cm"] == "CM20") & (real_events["year"] == "2022")]
+non_mp_peaks = peak_days_not_in_mp(peakdf, onlympevents)
+print("\nPeak quench days not in MP:")
+print(non_mp_peaks.to_string(index=False))
 
 # ----------------------------------------------------------------------- #
 # Plot toggles. Flip True/False to turn individual plots on or off.
@@ -67,7 +71,7 @@ PLOTS = {
 
 # Box plot: real quenches per cavity, slice of cryomodules
 if PLOTS["box_real_slice_cm"]:
-    cm_slice = (34, 36)
+    cm_slice = (35, 37)
     box_plot_quenches_per_cavity(
         events, classification="real", cm_slice=cm_slice,
         save_path=os.path.join(
@@ -151,7 +155,7 @@ if PLOTS["bar_per_year"]:
             save_path=os.path.join(IMG_DIR, f"quenches_{year}_by_cryo.png"),
         )
 
-# # All-years line plot
+# All-years line plot
 if PLOTS["line_all_years"]:
     line_quenches_all_years(
         events, log=True,

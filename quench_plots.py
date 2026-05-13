@@ -14,6 +14,11 @@ Questions answered with these plots:
 DEFAULT_FONT = 20
 DEFAULT_FIGSIZE = (14, 6)
 
+# Common axis labels reused across most plots. Pass an explicit string to
+# `_style` to override; pass None to fall back to these defaults.
+XLABEL_CM = "Cryomodule Number"
+YLABEL_COUNT = "Number of Quenches"
+
 REAL_COLOR = "#009E73"  # Okabe-Ito green
 FALSE_COLOR = "#8C1515"  # Stanford cardinal red
 BAR_COLOR = "#0072B2"  # Okabe-Ito blue (generic single-color bars)
@@ -137,8 +142,8 @@ def _clean_grid(ax, font_size):
 
 
 def _style(ax, xlabel, ylabel, title, font_size, xticks=None, xticklabels=None, rotation=90):
-    ax.set_xlabel(xlabel, fontsize=font_size)
-    ax.set_ylabel(ylabel, fontsize=font_size)
+    ax.set_xlabel(xlabel if xlabel is not None else XLABEL_CM, fontsize=font_size)
+    ax.set_ylabel(ylabel if ylabel is not None else YLABEL_COUNT, fontsize=font_size)
     ax.set_title(title, fontsize=font_size)
     if xticks is not None:
         ax.set_xticks(xticks)
@@ -169,7 +174,7 @@ def _finish(fig, save_path, show):
 # --------------------------------------------------------------------------- #
 
 def box_plot_quenches_per_cavity(events, classification=None, cm_slice=None,
-                                 ylim=(-10, 400), title=None,
+                                 ylim=None, title=None,
                                  annotate_totals=False, log=False,
                                  section_dividers=False, compact_label=False,
                                  font_size=DEFAULT_FONT, figsize=(8, 6),
@@ -179,7 +184,8 @@ def box_plot_quenches_per_cavity(events, classification=None, cm_slice=None,
     `cm_slice` is a (start, stop) tuple to plot a subset of cryomodules
     in the order of ``events['cm']`` (e.g. (3, 8)). None = all.
     `classification` is 'real', 'false', or None for no filtering.
-    `ylim` may be None for autoscale.
+    `ylim` may be None for autoscale based on the data extent (with a
+    small margin); pass an explicit (lo, hi) tuple to override.
     `annotate_totals` adds the per-CM total to each x-tick label.
     `compact_label` puts the total on the same line as the CM name.
     `log` sets the y-axis to log scale.
@@ -219,6 +225,12 @@ def box_plot_quenches_per_cavity(events, classification=None, cm_slice=None,
         ax.set_yscale("log")
     elif ylim is not None:
         ax.set_ylim(*ylim)
+    else:
+        # Auto-fit to the data with ~5% headroom and a small negative
+        # margin so boxes near zero aren't clipped at the axis.
+        data_max = max((arr.max() for arr in data if len(arr)), default=0)
+        pad = max(data_max * 0.05, 1)
+        ax.set_ylim(-pad, data_max + pad)
 
     if annotate_totals:
         sep = " " if compact_label else "\n"
@@ -227,9 +239,9 @@ def box_plot_quenches_per_cavity(events, classification=None, cm_slice=None,
         labels = cms
 
     label = _CLASS_LABEL[classification]
-    _style(ax, "Cryomodule Number",
-           f"Number of {label}Quenches per Cavity",
-           title or f"{label}Quench Distributions per Cryomodule",
+    _style(ax, None,
+           f"Number of {label}quenches",
+           title or f"{label}quench distributions per cryomodule",
            font_size, xticks=np.arange(1, len(cms) + 1),
            xticklabels=labels, rotation=45)
     _clean_grid(ax, font_size)
@@ -256,8 +268,8 @@ def bar_quenches_per_cryo(events, classification=None, title=None,
     _annotate_bars(ax, bars, offset=max(counts.values) * 0.01 + 1)
     if section_colors:
         add_section_decorations(ax, cms, font_size=font_size, x_offset=0)
-    _style(ax, "Cryomodule Number", f"Number of {label}Quenches",
-           title or f"{label}Quenches per Cryomodule",
+    _style(ax, None, f"Number of {label}Quenches",
+           title or f"{label}quenches per cryomodule",
            font_size, xticks=np.arange(len(counts)),
            xticklabels=cms)
     _finish(fig, save_path, show)
@@ -270,11 +282,11 @@ def bar_real_vs_false_stacked(events, title="Real vs False Quenches per Cryomodu
     cms, r, f = _real_false_by_cm(events)
 
     fig, ax = plt.subplots(figsize=figsize)
-    ax.bar(cms, r, label="Real Quenches", color=REAL_COLOR,
+    ax.bar(cms, r, label="Real quenches", color=REAL_COLOR,
            edgecolor="grey", linewidth=0.6)
-    ax.bar(cms, f, bottom=r, label="False Quenches", color=FALSE_COLOR,
+    ax.bar(cms, f, bottom=r, label="False quenches", color=FALSE_COLOR,
            hatch="//", edgecolor="grey", linewidth=0.6)
-    _style(ax, "Cryomodule", "Number of Quenches", title,
+    _style(ax, None, None, title,
            font_size, xticks=np.arange(len(cms)), xticklabels=cms)
     ax.set_xlim(-0.6, len(cms) - 0.4)
     ax.tick_params(axis="both", labelsize=14)
@@ -316,7 +328,7 @@ def scatter_total_real_false(events, title="Total / Real / False Quenches per Cr
               title_fontsize=font_size - 2, framealpha=0.9)
     if section_dividers:
         add_section_dividers(ax, cms, font_size=font_size, x_offset=0)
-    _style(ax, "Cryomodule Number", "Number of Quenches", title,
+    _style(ax, None, None, title,
            font_size, xticks=x, xticklabels=cms, rotation=45)
     _clean_grid(ax, font_size)
     _finish(fig, save_path, show)
@@ -340,7 +352,7 @@ def bar_real_vs_false_grouped(events, cm_slice=None, log=False,
     if log:
         ax.set_yscale("log")
     suffix = " (Log Scale)" if log else ""
-    _style(ax, "Cryomodule", "Number of Quenches",
+    _style(ax, None, None,
            title or f"Real vs False Quenches per Cryomodule{suffix}",
            font_size, xticks=x, xticklabels=cms)
     ax.legend()
@@ -395,8 +407,8 @@ def bar_quenches_per_year(events, year, title=None, font_size=DEFAULT_FONT,
     fig, ax = plt.subplots(figsize=figsize)
     bars = ax.bar(counts.index, counts.values, color=BAR_COLOR)
     _annotate_bars(ax, bars, offset=max(counts.values) * 0.01 + 1)
-    _style(ax, "Cryomodule Number", "Number of Quenches",
-           title or f"Number of Quenches in {year} by Cryomodule",
+    _style(ax, None, None,
+           title or f"Number of quenches in {year} by cryomodule",
            font_size, xticks=np.arange(len(counts)),
            xticklabels=counts.index.tolist())
     _finish(fig, save_path, show)
@@ -425,7 +437,7 @@ def line_quenches_all_years(events, title="Number of Quenches per Cryomodule (Al
         ax.set_ylim(*ylim)
     ax.legend(title="Year", loc="upper left", fontsize=font_size - 2,
               title_fontsize=font_size - 2, framealpha=0.9)
-    _style(ax, "Cryomodule Number", "Number of Quenches", title,
+    _style(ax, None, None, title,
            font_size, xticks=np.arange(len(cms)), xticklabels=cms,
            rotation=45)
     _clean_grid(ax, font_size)
@@ -440,7 +452,7 @@ def bar_quenches_per_cavity(events, cm, title=None, font_size=DEFAULT_FONT,
     fig, ax = plt.subplots(figsize=figsize)
     bars = ax.bar(counts.index, counts.values, color=BAR_COLOR)
     _annotate_bars(ax, bars, offset=max(counts.values) * 0.01 + 1)
-    _style(ax, "Cavity Number", "Number of Quenches",
+    _style(ax, "Cavity Number", None,
            title or f"Number of Quenches per Cavity in {cm}",
            font_size, xticks=np.arange(len(counts)),
            xticklabels=counts.index.tolist())
@@ -468,7 +480,7 @@ def bar_quenches_per_month(events, cm="CM20", cav="CAV1", year="2022",
     if y.max() > 0:
         _annotate_bars(ax, bars, offset=max(y) * 0.01 + 0.5,
                        fontsize=font_size - 4)
-    _style(ax, "Month", "Number of Quenches",
+    _style(ax, "Month", None,
            title or f"Quenches per Month in {cm} {cav} ({year})",
            font_size, xticks=x, xticklabels=_MONTHS, rotation=0)
     _clean_grid(ax, font_size)

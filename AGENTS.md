@@ -67,6 +67,75 @@ should be followed unless the user says otherwise in a specific request.
   300 dpi via `_finish`. `show=False` is the default; the figure is
   closed after save to keep memory bounded.
 
+## Palette and styling defaults
+
+- Color-blind-friendly palette is the default:
+  - `REAL_COLOR = "#009E73"` (Okabe-Ito green)
+  - `FALSE_COLOR = "#8C1515"` (Stanford cardinal red)
+  - `BAR_COLOR  = "#0072B2"` (Okabe-Ito blue, generic single-color bars)
+- Linac sections (`SECTIONS` table) use distinct CB-safe colors:
+  L0 `#0072B2`, L1 `#009E73`, HL `#D55E00`, L2 `#AA4499`, L3 `#E69F00`.
+- For grayscale legibility, the False (red) series carries a `//` hatch
+  in both the pie chart and the stacked bar chart. When adding new red
+  series, mirror that pattern.
+- Default font / figsize constants live at the top of `quench_plots.py`
+  (`DEFAULT_FONT`, `DEFAULT_FIGSIZE`). Reuse them; don't sprinkle magic
+  numbers in plot calls.
+- Common axis labels are centralized as `XLABEL_CM = "Cryomodule Number"`
+  and `YLABEL_COUNT = "Number of Quenches"`. Pass `None` to `_style` for
+  these defaults; pass a string only when the axis is genuinely different
+  (e.g. `"Cavity Number"`, `"Month"`).
+- Plot titles use **sentence case**: capitalize only the first word and
+  proper identifiers (e.g. `CM01-CM35`). Do not Title-Case every word.
+
+## Cryomodule ordering
+
+- Physical CM order is
+  `["CM01","CM02","CM03","CMH1","CMH2"] + [f"CM{n:02d}" for n in range(4,36)]`.
+  The driver script applies this as a `pd.Categorical` to `events["cm"]`
+  before plotting.
+- Always pass `observed=True` to `groupby` on Categorical columns to
+  silence the pandas FutureWarning and avoid empty-category rows.
+
+## Common data gotchas
+
+- `events["year"]`, `events["month"]`, `events["day"]` are **strings**
+  (zero-padded), not ints. Filter with `== "2022"`, not `== 2022`.
+- `add_section_dividers`/`add_section_decorations` will index out of
+  range on an empty `cms` list. If a filter could produce an empty
+  frame, guard the call site rather than the helper.
+
+## Helper functions in `quench_data_summary.py`
+
+- `mp_events(events, keep=False)` — filter against `data/MPdates.csv`
+  (match key `(cm, cav, YYYYMMDD)`). `keep=True` returns only MP rows.
+- `peak_quench_day_per_cavity(events, top_n=N, real_only=True)` —
+  per-cavity busiest days; returns columns
+  `cm, cav, year, month, day, count, rank` (rank 1 = busiest, ties
+  broken by earliest date). Also writes
+  `data/peak_quench_days.csv`.
+- `print_peak_quench_day_summary(...)` — pretty-printed table of the
+  same data.
+- `peak_days_not_in_mp(peak, mp_events_df)` — set-difference on
+  `(cm, cav, year, month, day)`; returns peak rows whose date is not
+  in the MP frame. Useful for finding candidate missing MP entries.
+- One-liner for "real quenches on quiet (cavity, day) groups":
+  ```python
+  quiet_real = real_events.groupby(
+      ["cm","cav","year","month","day"], observed=True
+  ).filter(lambda g: len(g) < THRESHOLD)
+  ```
+
+## Driver script conventions (`hdf5_file_plot.py`)
+
+- All plot calls are gated by a `PLOTS = {...}` toggle dict at the top
+  of the script. Add new plots there; don't comment whole blocks in/out.
+- Slice-derived filenames should be built from the slice itself, e.g.
+  `f"..._{cm_slice[0]}-{cm_slice[1]-1}.png"` — don't hardcode CM numbers
+  in path strings.
+- Keep magic thresholds named (e.g. `PEAK_TOP_N`, `PEAK_MIN_COUNT`) so
+  the print line can describe the filter parameters.
+
 ## File-link / output formatting
 
 - Use Markdown links to workspace-relative paths for file references

@@ -43,18 +43,33 @@ nompevents   = mp_events(real_events, keep=False)
 onlympevents = mp_events(real_events, keep=True)
 print(f"\nMP events: {len(onlympevents)}, non-MP events: {len(nompevents)}")
 
-#print_peak_quench_day_summary(real_events, top_n=3, real_only=True)
-peakdf    = peak_quench_day_per_cavity(real_events, top_n=3, real_only=True)
-#cm20_2022 = real_events[(real_events["cm"] == "CM20") & (real_events["year"] == "2022")]
-non_mp_peaks = peak_days_not_in_mp(peakdf, onlympevents)
-print("\nPeak quench days not in MP:")
-print(non_mp_peaks.to_string(index=False))
+# # ----------------------------------------------------------------------- #
+# # Find days that *look* like MP (a cavity's busiest quench days) but are
+# # not recorded in MPdates.csv. These are candidate missing MP entries.
+# # ----------------------------------------------------------------------- #
+# PEAK_TOP_N = 2          # consider each cavity's top-N busiest days
+# PEAK_MIN_COUNT = 10     # only flag days with more than this many quenches
+# peakdf = peak_quench_day_per_cavity(real_events, top_n=PEAK_TOP_N, real_only=True)
+# candidates = peak_days_not_in_mp(peakdf, onlympevents)
+# candidates = candidates[candidates["count"] > PEAK_MIN_COUNT].reset_index(drop=True)
+# # candidates = candidates[~candidates["cm"].isin(["CM34", "CM35"])].reset_index(drop=True)
 
+# print(f"\nCandidate missing MP days "
+#       f"(top-{PEAK_TOP_N} per cavity, count > {PEAK_MIN_COUNT}):")
+# print(candidates.to_string(index=False))
+# candidates.to_csv(os.path.join(HERE, "data", "non_mp_peak_quench_days.csv"),
+#                   index=False)
+
+# No MP candidates: 
+nomp_real = real_events.groupby(["cm", "cav", "year", "month", "day"], observed=True).filter(lambda g: len(g) < 10)
+
+events2022 = real_events[real_events["year"] == "2022"]
+events2025 = real_events[real_events["year"] == "2025"]
 # ----------------------------------------------------------------------- #
 # Plot toggles. Flip True/False to turn individual plots on or off.
 # ----------------------------------------------------------------------- #
 PLOTS = {
-    "box_real_slice_cm":    True,
+    "box_real_slice_cm":    False,
     "box_real_all":         False,
     "bar_all_per_cryo":     False,
     "bar_real_vs_false_stk": False,
@@ -64,7 +79,7 @@ PLOTS = {
     "pie_real_vs_false":     False,
     "bar_per_year":         False,
     "line_all_years":       False,
-    "bar_per_cavity":       False,
+    "bar_per_cavity":       True,
     "scatter_totals":       False,
     "bar_per_month":    False,
 }
@@ -82,26 +97,27 @@ if PLOTS["box_real_slice_cm"]:
 
 if PLOTS["box_real_all"]:
     box_plot_quenches_per_cavity(
-        events, classification="real",
+        #nomp_real, classification="real",
+        events2022, classification="real",
         log=True, annotate_totals=True, compact_label=True,
         section_dividers=True, font_size=20, figsize=(22, 7),
-        title="All real quench distributions per cryomodule (2022-2026)",
-        save_path=os.path.join(IMG_DIR, "real_quench_distributions_per_cryo_all.png"),
+        title="All real quench distributions per cryomodule (2022)",
+        save_path=os.path.join(IMG_DIR, "real_quench_distributions_per_cryo_all_2022.png"),
     )
 
 # All quenches per cryomodule
 if PLOTS["bar_all_per_cryo"]:
     bar_quenches_per_cryo(
-        events, section_colors=True,
-        title="Number of Quenches Per Cryomodule (2022-2026)",
-        save_path=os.path.join(IMG_DIR, "all_quench_counts_per_cryo.png"),
+        nomp_real, section_colors=True,
+        title="Number of quenches per cryomodule (2022-2025)",
+        save_path=os.path.join(IMG_DIR, "all_quench_counts_per_cryo_nomp.png"),
     )
 
 # Real and false stacked
 if PLOTS["bar_real_vs_false_stk"]:
     bar_real_vs_false_stacked(
         events,
-        title="Real vs False Quenches per Cryomodule (2022-2026)",
+        title="Real vs false quenches per cryomodule (2022-2025)",
         save_path=os.path.join(IMG_DIR, "real_vs_false_quenches_stacked.png"),
     )
 
@@ -110,7 +126,7 @@ if PLOTS["bar_real_vs_false_grp"]:
     bar_real_vs_false_grouped(
         events, #cm_slice=(7, 12),
         log=True,
-        title="Real vs False Quenches per Cryomodule on Log Scale (2022-2026)",
+        title="Real vs false quenches per cryomodule on log scale (2022-2025)",
         save_path=os.path.join(IMG_DIR, "real_vs_false_quenches_log_scale.png"),
     )
 
@@ -118,7 +134,7 @@ if PLOTS["bar_real_vs_false_grp"]:
 if PLOTS["bar_real_per_cryo"]:
     bar_quenches_per_cryo(
         events, classification="real", section_colors=True,
-        title="Real Quenches per Cryomodule (2022-2026)",
+        title="Real quenches per cryomodule (2022-2025)",
         save_path=os.path.join(IMG_DIR, "real_quenches_per_cryo.png"),
     )
 
@@ -126,7 +142,7 @@ if PLOTS["bar_real_per_cryo"]:
 if PLOTS["bar_false_per_cryo"]:
     bar_quenches_per_cryo(
         events, classification="false", section_colors=True,
-        title="False Quenches per Cryomodule (2022-2026)",
+        title="False quenches per cryomodule (2022-2025)",
         save_path=os.path.join(IMG_DIR, "false_quenches_per_cryo.png"),
     )
 
@@ -134,7 +150,7 @@ if PLOTS["bar_false_per_cryo"]:
 if PLOTS["pie_real_vs_false"]:
     pie_real_vs_false(
         events,
-        title="Overall Quench Classification CM01-CM35 (2022-2026)",
+        title="Overall quench classification CM01-CM35 (2022-2025)",
         save_path=os.path.join(IMG_DIR, "real_vs_false_pie.png"),
     )
 
@@ -143,7 +159,7 @@ if PLOTS["scatter_totals"]:
     scatter_total_real_false(
         events, log=True, section_dividers=True,
         font_size=17, figsize=(18, 7),
-        title="Total / Real / False Quenches per Cryomodule (2022-2026)",
+        title="Total / real / false quenches per cryomodule (2022-2025)",
         save_path=os.path.join(IMG_DIR, "scatter_total_real_false.png"),
     )
 
@@ -164,14 +180,17 @@ if PLOTS["line_all_years"]:
     )
 
 # Per-cavity bar for each cryomodule
+cm34 = events2025[events2025["cm"] == "CM34"]
+cm35 = events2025[events2025["cm"] == "CM35"]
+cavity_events = cm34
 if PLOTS["bar_per_cavity"]:
-    #for cm in sorted(events["cm"].unique()):
-    years = sorted(cm20_2022["year"].unique())
+    years = sorted(cavity_events["year"].unique())
     yr_label = years[0] if len(years) == 1 else f"{years[0]}-{years[-1]}"
-    for cm in cm20_2022["cm"].unique():
+    for cm in cavity_events["cm"].unique():
         bar_quenches_per_cavity(
-            cm20_2022, cm,
-            title=f"Number of quenches per cavity in {cm} ({yr_label})",
+            cavity_events, cm,
+            title=f"{cm} ({yr_label})",
+            figsize=(7, 6),
             save_path=os.path.join(IMG_DIR, f"quenches_per_cavity_{cm}_{yr_label}.png"),
         )
 

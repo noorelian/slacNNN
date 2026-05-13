@@ -16,12 +16,12 @@ DEFAULT_FIGSIZE = (14, 6)
 
 # Common axis labels reused across most plots. Pass an explicit string to
 # `_style` to override; pass None to fall back to these defaults.
-XLABEL_CM = "Cryomodule Number"
-YLABEL_COUNT = "Number of Quenches"
+XLABEL_CM = "Cryomodule number"
+YLABEL_COUNT = "Number of quenches"
 
 REAL_COLOR = "#009E73"  # Okabe-Ito green
 FALSE_COLOR = "#8C1515"  # Stanford cardinal red
-BAR_COLOR = "#0072B2"  # Okabe-Ito blue (generic single-color bars)
+BAR_COLOR = "#009E73" # "#0072B2"  # Okabe-Ito blue (generic single-color bars)
 
 # Linac sections (used for grouping/coloring CMs in plots).
 SECTIONS = [
@@ -403,7 +403,7 @@ def bar_quenches_per_year(events, year, title=None, font_size=DEFAULT_FONT,
                           figsize=DEFAULT_FIGSIZE, save_path=None, show=False):
     """Bar chart of quench counts per cryomodule for a single year."""
     sub = events[events["year"] == str(year)]
-    counts = sub.groupby("cm").size().sort_index()
+    counts = sub.groupby("cm", observed=True).size().sort_index()
     fig, ax = plt.subplots(figsize=figsize)
     bars = ax.bar(counts.index, counts.values, color=BAR_COLOR)
     _annotate_bars(ax, bars, offset=max(counts.values) * 0.01 + 1)
@@ -448,12 +448,12 @@ def bar_quenches_per_cavity(events, cm, title=None, font_size=DEFAULT_FONT,
                             figsize=DEFAULT_FIGSIZE, save_path=None, show=False):
     """Bar chart of quench counts per cavity for a single cryomodule."""
     sub = events[events["cm"] == cm]
-    counts = sub.groupby("cav").size().sort_index()
+    counts = sub.groupby("cav", observed=True).size().sort_index()
     fig, ax = plt.subplots(figsize=figsize)
     bars = ax.bar(counts.index, counts.values, color=BAR_COLOR)
-    _annotate_bars(ax, bars, offset=max(counts.values) * 0.01 + 1)
-    _style(ax, "Cavity Number", None,
-           title or f"Number of Quenches per Cavity in {cm}",
+    _annotate_bars(ax, bars, offset=max(counts.values) * 0.01 + 1, fontsize=16)
+    _style(ax, "Cavity number", None,
+           title or f"Number of quenches per cavity in {cm}",
            font_size, xticks=np.arange(len(counts)),
            xticklabels=counts.index.tolist())
     _finish(fig, save_path, show)
@@ -470,7 +470,7 @@ def bar_quenches_per_month(events, cm="CM20", cav="CAV1", year="2022",
     """Bar chart of monthly quench counts for a single cavity in a given year."""
     sub = events[(events["cm"] == cm) & (events["cav"] == cav)
                  & (events["year"] == str(year))]
-    counts = (sub.groupby("month").size()
+    counts = (sub.groupby("month", observed=True).size()
                  .reindex([f"{m:02d}" for m in range(1, 13)], fill_value=0))
     x = np.arange(1, 13)
     y = counts.values

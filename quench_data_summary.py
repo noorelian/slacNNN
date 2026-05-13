@@ -35,6 +35,46 @@ def mp_events(events, keep=False):
     mask = in_mp if keep else [not x for x in in_mp]
     return events[mask].reset_index(drop=True)
 
+def peak_quench_day_per_cavity(events, top_n=3, real_only=True):
+    """For each (cm, cav), return the ``top_n`` days with the most quenches.
+
+    Returns a DataFrame with columns
+    ``["cm", "cav", "year", "month", "day", "count", "rank"]`` sorted by
+    cm, cav, then rank. ``rank`` is 1 for the busiest day, 2 for the
+    next busiest, etc. Ties are broken by the earliest date. Cavities
+    with fewer than ``top_n`` distinct quench days return all available
+    days.
+    """
+    df = events[events["is_real"]] if real_only else events
+    daily = (
+        df.groupby(["cm", "cav", "year", "month", "day"], observed=True)
+          .size()
+          .reset_index(name="count")
+          .sort_values(["cm", "cav", "count", "year", "month", "day"],
+                       ascending=[True, True, False, True, True, True])
+    )
+    peak = daily.groupby(["cm", "cav"], observed=True).head(top_n).copy()
+    peak["rank"] = peak.groupby(["cm", "cav"], observed=True).cumcount() + 1
+    peak.to_csv(os.path.join(os.path.dirname(__file__), "data", "peak_quench_days.csv"), index=False)
+    return peak.reset_index(drop=True)
+
+
+def print_peak_quench_day_summary(events, top_n=3, real_only=True):
+    """Pretty-print the top ``top_n`` quench days for each cavity."""
+    peak = peak_quench_day_per_cavity(events, top_n=top_n, real_only=real_only)
+    label = "real" if real_only else "all"
+    print(f"\nTop {top_n} quench days per cavity ({label} quenches):")
+    print(f"  cavities: {peak.groupby(['cm', 'cav'], observed=True).ngroups}")
+    header = f"  {'CM':<5} {'CAV':<5} {'rank':<5} {'date':<10} {'count':>6}"
+    print(header)
+    print("  " + "-" * (len(header) - 2))
+    for _, row in peak.iterrows():
+        date = f"{int(row['year']):04d}-{int(row['month']):02d}-{int(row['day']):02d}"
+        print(f"  {row['cm']:<5} {row['cav']:<5} {int(row['rank']):<5} "
+              f"{date:<10} {int(row['count']):>6}")
+    return peak
+
+
 def _resolve_paths(source):
     """Normalize a source spec to a sorted list of H5 file paths."""
     if isinstance(source, str) and any(c in source for c in "*?["):

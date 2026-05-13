@@ -2,13 +2,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from quench_data_summary import load_quench_events  # re-exported
+"""
+Questions answered with these plots:
+    (1) Which cryomodule quenched the most?
+    (2) How many real quenches per cryomodule?
+    (3) How many false quenches per cryomodule?
+    (4) How many quenches per year?
+    (5) Which cavity quenched the most?
+"""
 
-DEFAULT_FONT = 14
+DEFAULT_FONT = 20
 DEFAULT_FIGSIZE = (14, 6)
 
-REAL_COLOR = "#0072B2"  # Okabe-Ito blue
-FAKE_COLOR = "#E69F00"  # Okabe-Ito orange
-BAR_COLOR = REAL_COLOR
+REAL_COLOR = "#009E73"  # Okabe-Ito green
+FALSE_COLOR = "#8C1515"  # Stanford cardinal red
+BAR_COLOR = "#0072B2"  # Okabe-Ito blue (generic single-color bars)
 
 # Linac sections (used for grouping/coloring CMs in plots).
 SECTIONS = [
@@ -18,15 +26,6 @@ SECTIONS = [
     ("L2", [f"CM{n:02d}" for n in range(4, 16)],  "#AA4499"),
     ("L3", [f"CM{n:02d}" for n in range(16, 36)], "#E69F00"),
 ]
-
-"""
-Questions answered with these plots:
-    (1) Which cryomodule quenched the most?
-    (2) How many real quenches per cryomodule?
-    (3) How many fake quenches per cryomodule?
-    (4) How many quenches per year?
-    (5) Which cavity quenched the most?
-"""
 
 def _section_for(cm):
     for name, members, color in SECTIONS:
@@ -100,17 +99,17 @@ def add_section_dividers(ax, cms, font_size=DEFAULT_FONT, x_offset=1):
 # --------------------------------------------------------------------------- #
 
 def _filter_class(events, classification):
-    """classification: 'real' or 'fake'. Pass the events frame directly
+    """classification: 'real' or 'false'. Pass the events frame directly
     if no filtering is wanted."""
     if classification == "real":
         return events[events["is_real"].astype(bool)]
-    if classification == "fake":
+    if classification == "false":
         return events[~events["is_real"].astype(bool)]
-    raise ValueError(f"classification must be 'real' or 'fake' (got {classification!r})")
+    raise ValueError(f"classification must be 'real' or 'false' (got {classification!r})")
 
 
-_CLASS_LABEL = {None: "", "real": "Real ", "fake": "Fake "}
-_CLASS_COLOR = {None: BAR_COLOR, "real": REAL_COLOR, "fake": FAKE_COLOR}
+_CLASS_LABEL = {None: "", "real": "Real ", "false": "False "}
+_CLASS_COLOR = {None: BAR_COLOR, "real": REAL_COLOR, "false": FALSE_COLOR}
 
 
 def _annotate_bars(ax, bars, offset=10, fontsize=8):
@@ -120,13 +119,13 @@ def _annotate_bars(ax, bars, offset=10, fontsize=8):
                 ha="center", fontsize=fontsize)
 
 
-def _real_fake_by_cm(events):
-    """Return (cms, real_counts, fake_counts) aligned to a stable CM order."""
+def _real_false_by_cm(events):
+    """Return (cms, real_counts, false_counts) aligned to a stable CM order."""
     real = events[events["is_real"].astype(bool)].groupby("cm", observed=True).size()
-    fake = events[~events["is_real"].astype(bool)].groupby("cm", observed=True).size()
-    cms = list(real.index.union(fake.index, sort=False))
+    false = events[~events["is_real"].astype(bool)].groupby("cm", observed=True).size()
+    cms = list(real.index.union(false.index, sort=False))
     r = real.reindex(cms, fill_value=0).values
-    f = fake.reindex(cms, fill_value=0).values
+    f = false.reindex(cms, fill_value=0).values
     return cms, r, f
 
 
@@ -169,7 +168,7 @@ def _finish(fig, save_path, show):
 # plots
 # --------------------------------------------------------------------------- #
 
-def box_plot_quenches_per_cavity(events, classification=None, cryo_slice=None,
+def box_plot_quenches_per_cavity(events, classification=None, cm_slice=None,
                                  ylim=(-10, 400), title=None,
                                  annotate_totals=False, log=False,
                                  section_dividers=False, compact_label=False,
@@ -177,9 +176,9 @@ def box_plot_quenches_per_cavity(events, classification=None, cryo_slice=None,
                                  save_path=None, show=False):
     """Box plot of per-cavity quench counts, one box per cryomodule.
 
-    `cryo_slice` is a (start, stop) tuple to plot a subset of cryomodules
+    `cm_slice` is a (start, stop) tuple to plot a subset of cryomodules
     in the order of ``events['cm']`` (e.g. (3, 8)). None = all.
-    `classification` is 'real', 'fake', or None for no filtering.
+    `classification` is 'real', 'false', or None for no filtering.
     `ylim` may be None for autoscale.
     `annotate_totals` adds the per-CM total to each x-tick label.
     `compact_label` puts the total on the same line as the CM name.
@@ -191,8 +190,8 @@ def box_plot_quenches_per_cavity(events, classification=None, cryo_slice=None,
     counts = (sub.groupby(["cm", "cav"], observed=True).size()
                  .unstack(fill_value=0))
     cms = counts.index.tolist()  # preserves Categorical order
-    if cryo_slice is not None:
-        cms = cms[cryo_slice[0]:cryo_slice[1]]
+    if cm_slice is not None:
+        cms = cms[cm_slice[0]:cm_slice[1]]
     data = [counts.loc[cm].values for cm in cms]
 
     fig, ax = plt.subplots(figsize=figsize)
@@ -243,7 +242,7 @@ def bar_quenches_per_cryo(events, classification=None, title=None,
                           save_path=None, show=False):
     """Bar chart: total quenches per cryomodule.
 
-    `classification` is 'real', 'fake', or None for no filtering.
+    `classification` is 'real', 'false', or None for no filtering.
     `section_colors` colors bars by linac section and adds separators/legend.
     """
     sub = _filter_class(events, classification) if classification else events
@@ -264,65 +263,126 @@ def bar_quenches_per_cryo(events, classification=None, title=None,
     _finish(fig, save_path, show)
 
 
-def bar_real_vs_fake_stacked(events, title="Real vs Fake Quenches per Cryomodule",
+def bar_real_vs_false_stacked(events, title="Real vs False Quenches per Cryomodule",
                              font_size=DEFAULT_FONT, figsize=(20, 8),
                              save_path=None, show=False):
-    """Stacked bar: real (bottom) + fake (top) per cryomodule."""
-    cms, r, f = _real_fake_by_cm(events)
+    """Stacked bar: real (bottom) + false (top) per cryomodule."""
+    cms, r, f = _real_false_by_cm(events)
 
     fig, ax = plt.subplots(figsize=figsize)
-    ax.bar(cms, r, label="Real Quenches", color=REAL_COLOR)
-    ax.bar(cms, f, bottom=r, label="Fake Quenches", color=FAKE_COLOR)
+    ax.bar(cms, r, label="Real Quenches", color=REAL_COLOR,
+           edgecolor="grey", linewidth=0.6)
+    ax.bar(cms, f, bottom=r, label="False Quenches", color=FALSE_COLOR,
+           hatch="//", edgecolor="grey", linewidth=0.6)
     _style(ax, "Cryomodule", "Number of Quenches", title,
            font_size, xticks=np.arange(len(cms)), xticklabels=cms)
-    ax.legend()
+    ax.set_xlim(-0.6, len(cms) - 0.4)
+    ax.tick_params(axis="both", labelsize=14)
+    for lbl in ax.get_xticklabels():
+        lbl.set_fontsize(14)
+    ax.legend(fontsize=20)
     _finish(fig, save_path, show)
 
 
-def bar_real_vs_fake_grouped(events, cryo_slice=None, log=False,
+def scatter_total_real_false(events, title="Total / Real / False Quenches per Cryomodule",
+                             log=False, section_dividers=False,
+                             font_size=DEFAULT_FONT, figsize=DEFAULT_FIGSIZE,
+                             save_path=None, show=False):
+    """Scatter with three overlaid series (total, real, false) per CM.
+
+    `log` sets the y-axis to log scale.
+    `section_dividers` adds linac-section vertical lines + top labels.
+    """
+    cms, r, f = _real_false_by_cm(events)
+    total = r + f
+    x = np.arange(len(cms))
+
+    # Colors match the pie chart (Okabe-Ito green, Stanford cardinal red);
+    # distinct shapes + white edges keep series readable when overlapping.
+    series = [
+        ("Total", total, "#000000", "o", 140),  # circle
+        ("Real",  r,     "#009E73", "D", 110),  # diamond, green
+        ("False", f,     "#8C1515", "^", 120),  # triangle, cardinal red
+    ]
+    fig, ax = plt.subplots(figsize=figsize)
+    for label, y, color, marker, size in series:
+        # Connecting line makes the per-series trend easy to follow.
+        ax.plot(x, y, color=color, linewidth=1.8, alpha=0.5, zorder=2)
+        ax.scatter(x, y, label=label, color=color, marker=marker,
+                   s=size, edgecolor="white", linewidth=1.4, zorder=3)
+    if log:
+        ax.set_yscale("log")
+    ax.legend(loc="center right", fontsize=font_size - 2,
+              title_fontsize=font_size - 2, framealpha=0.9)
+    if section_dividers:
+        add_section_dividers(ax, cms, font_size=font_size, x_offset=0)
+    _style(ax, "Cryomodule Number", "Number of Quenches", title,
+           font_size, xticks=x, xticklabels=cms, rotation=45)
+    _clean_grid(ax, font_size)
+    _finish(fig, save_path, show)
+
+
+def bar_real_vs_false_grouped(events, cm_slice=None, log=False,
                              title=None, font_size=DEFAULT_FONT,
                              figsize=(15, 7), save_path=None, show=False):
-    """Side-by-side bars of real and fake quenches per cryomodule."""
-    cms, r, f = _real_fake_by_cm(events)
-    if cryo_slice is not None:
-        cms = cms[cryo_slice[0]:cryo_slice[1]]
-        r = r[cryo_slice[0]:cryo_slice[1]]
-        f = f[cryo_slice[0]:cryo_slice[1]]
+    """Side-by-side bars of real and false quenches per cryomodule."""
+    cms, r, f = _real_false_by_cm(events)
+    if cm_slice is not None:
+        cms = cms[cm_slice[0]:cm_slice[1]]
+        r = r[cm_slice[0]:cm_slice[1]]
+        f = f[cm_slice[0]:cm_slice[1]]
 
     x = np.arange(len(cms))
     w = 0.4
     fig, ax = plt.subplots(figsize=figsize)
     ax.bar(x - w / 2, r, width=w, label="Real Quenches", color=REAL_COLOR)
-    ax.bar(x + w / 2, f, width=w, label="Fake Quenches", color=FAKE_COLOR)
+    ax.bar(x + w / 2, f, width=w, label="False Quenches", color=FALSE_COLOR)
     if log:
         ax.set_yscale("log")
     suffix = " (Log Scale)" if log else ""
     _style(ax, "Cryomodule", "Number of Quenches",
-           title or f"Real vs Fake Quenches per Cryomodule{suffix}",
+           title or f"Real vs False Quenches per Cryomodule{suffix}",
            font_size, xticks=x, xticklabels=cms)
     ax.legend()
     _finish(fig, save_path, show)
 
 
-def pie_real_vs_fake(events, title="Overall Quench Classification",
+def pie_real_vs_false(events, title="Overall Quench Classification",
                      font_size=DEFAULT_FONT, figsize=(6, 6),
                      save_path=None, show=False):
-    """Pie chart of real vs fake quenches across the whole input."""
+    """Pie chart of real vs false quenches across the whole input."""
     real = int(events["is_real"].astype(bool).sum())
-    fake = int((~events["is_real"].astype(bool)).sum())
+    false = int((~events["is_real"].astype(bool)).sum())
+    print(f"Real quenches: {real}, False quenches: {false}, Total: {real + false}")
+    names = ["Real", "False"]
     fig, ax = plt.subplots(figsize=figsize)
+    # autopct receives the slice's percentage; pair it with the matching name.
+    name_iter = iter(names)
+    def _label(pct):
+        return f"{pct:.1f}%\n{next(name_iter)}"
     wedges, texts, autotexts = ax.pie(
-        [real, fake], labels=["Real Quenches", "Fake Quenches"],
-        colors=[REAL_COLOR, FAKE_COLOR],
-        autopct="%1.1f%%", startangle=90,
-        textprops={"fontsize": font_size, "color": "white"},
+        [real, false], labels=None,
+        # Pie-specific palette: CB-safe green (Okabe-Ito) for real,
+        # Stanford cardinal red for false.
+        colors=["#009E73", "#8C1515"],
+        autopct=_label, startangle=90,
+        textprops={"fontsize": font_size + 4, "color": "white"},
     )
-    # Outer labels stay readable on a white background.
-    for t in texts:
-        t.set_color("black")
+    # Hatch only the false wedge so the two are still distinguishable in B&W.
+    wedges[1].set_hatch("//")
+    wedges[0].set_edgecolor("white")
+    wedges[0].set_linewidth(1.5)
+    wedges[1].set_edgecolor("grey")
+    wedges[1].set_linewidth(1.5)
     for t in autotexts:
         t.set_fontweight("bold")
-    ax.set_title(title, fontsize=font_size)
+        t.set_ha("center")
+    # Two-line title rendered close to the pie.
+    if "\n" not in title:
+        words = title.split()
+        mid = len(words) // 2 +1
+        title = " ".join(words[:mid]) + "\n" + " ".join(words[mid:])
+    ax.set_title(title, fontsize=font_size, pad=6)
     ax.axis("equal")
     _finish(fig, save_path, show)
 
@@ -384,4 +444,32 @@ def bar_quenches_per_cavity(events, cm, title=None, font_size=DEFAULT_FONT,
            title or f"Number of Quenches per Cavity in {cm}",
            font_size, xticks=np.arange(len(counts)),
            xticklabels=counts.index.tolist())
+    _finish(fig, save_path, show)
+
+
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def bar_quenches_per_month(events, cm="CM20", cav="CAV1", year="2022",
+                           title=None, font_size=DEFAULT_FONT,
+                           figsize=DEFAULT_FIGSIZE,
+                           save_path=None, show=False):
+    """Bar chart of monthly quench counts for a single cavity in a given year."""
+    sub = events[(events["cm"] == cm) & (events["cav"] == cav)
+                 & (events["year"] == str(year))]
+    counts = (sub.groupby("month").size()
+                 .reindex([f"{m:02d}" for m in range(1, 13)], fill_value=0))
+    x = np.arange(1, 13)
+    y = counts.values
+
+    fig, ax = plt.subplots(figsize=figsize)
+    bars = ax.bar(x, y, color=BAR_COLOR, edgecolor="white", linewidth=0.8)
+    if y.max() > 0:
+        _annotate_bars(ax, bars, offset=max(y) * 0.01 + 0.5,
+                       fontsize=font_size - 4)
+    _style(ax, "Month", "Number of Quenches",
+           title or f"Quenches per Month in {cm} {cav} ({year})",
+           font_size, xticks=x, xticklabels=_MONTHS, rotation=0)
+    _clean_grid(ax, font_size)
     _finish(fig, save_path, show)

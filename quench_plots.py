@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from quench_data_summary import load_quench_events  # re-exported
 """
@@ -483,5 +484,59 @@ def bar_quenches_per_month(events, cm="CM20", cav="CAV1", year="2022",
     _style(ax, "Month", None,
            title or f"Quenches per Month in {cm} {cav} ({year})",
            font_size, xticks=x, xticklabels=_MONTHS, rotation=0)
+    _clean_grid(ax, font_size)
+    _finish(fig, save_path, show)
+
+
+def line_quenches_by_section_over_time(events, sections=("L0", "L1", "L2", "L3"),
+                                       classification="real",
+                                       title="Quenches per linac section over time",
+                                       log=False,
+                                       font_size=DEFAULT_FONT,
+                                       figsize=(9, 6),
+                                       save_path=None, show=False):
+    """Time series of quench counts per linac section.
+
+    One line per entry in ``sections`` (default L0/L1/L2/L3 — HL excluded).
+    X-axis is year (one point per year). `log=True` uses a log y-axis.
+    `classification` is 'real', 'false', or None for no filtering.
+    """
+    sub = _filter_class(events, classification) if classification else events
+    # Map each row to its section name; drop rows whose CM is in an
+    # unrequested section (e.g. HL when only L0/L1/L2/L3 are wanted).
+    section_of = {cm: name for name, members, _ in SECTIONS for cm in members}
+    color_of   = {name: c for name, _, c in SECTIONS}
+    sub = sub.assign(section=sub["cm"].map(section_of))
+    sub = sub[sub["section"].isin(sections)]
+
+    counts = (sub.groupby([sub["year"].astype(int), "section"], observed=True)
+                 .size().unstack(fill_value=0).sort_index())
+    counts.index.name = "year"
+    # Reindex to the full year range so gaps show as zeros, not jumps.
+    full_idx = range(int(counts.index.min()), int(counts.index.max()) + 1)
+    counts = counts.reindex(full_idx, fill_value=0)
+    x = list(counts.index)
+
+    section_markers = ["o", "s", "D", "^", "v", "P", "X", "*"]
+    section_marker = {name: section_markers[i % len(section_markers)]
+                      for i, name in enumerate(sections)}
+
+    fig, ax = plt.subplots(figsize=figsize)
+    for name in sections:
+        if name not in counts.columns:
+            continue
+        y = counts[name].values
+        color = color_of[name]
+        ax.plot(x, y, label=name, color=color,
+                marker=section_marker[name], markersize=9,
+                markeredgecolor="white", markeredgewidth=1.0,
+                linewidth=2.2, alpha=0.9, zorder=2)
+    if log:
+        ax.set_yscale("log")
+    ax.legend(loc="upper right",
+              fontsize=font_size - 2, title_fontsize=font_size - 2,
+              framealpha=0.9)
+    _style(ax, "Year", None, title,
+           font_size, xticks=x, xticklabels=[str(y) for y in x], rotation=0)
     _clean_grid(ax, font_size)
     _finish(fig, save_path, show)

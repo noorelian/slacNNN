@@ -87,6 +87,11 @@ should be followed unless the user says otherwise in a specific request.
   (e.g. `"Cavity Number"`, `"Month"`).
 - Plot titles use **sentence case**: capitalize only the first word and
   proper identifiers (e.g. `CM01-CM35`). Do not Title-Case every word.
+- **One legend per plot, unless explicitly requested.** Stacking a
+  second legend (e.g. a year-marker key alongside a section-color key)
+  usually adds clutter without adding information that the axis ticks
+  or line colors don't already convey. Default to a single legend; if
+  the user wants two, they will say so.
 
 ## Cryomodule ordering
 
@@ -107,13 +112,21 @@ should be followed unless the user says otherwise in a specific request.
 
 ## Helper functions in `quench_data_summary.py`
 
-- `mp_events(events, keep=False)` — filter against `data/MPdates.csv`
-  (match key `(cm, cav, YYYYMMDD)`). `keep=True` returns only MP rows.
-- `peak_quench_day_per_cavity(events, top_n=N, real_only=True)` —
-  per-cavity busiest days; returns columns
+- `filter_events(events, classification=None, exclude_hl=False, exclude_mp=False, mp_source="all")`
+  — single entry point for slicing the events frame.
+  - `classification` ∈ {None, "real", "false"} (raises on bad value).
+  - `exclude_hl=True` drops `CMHLs = ["CMH1", "CMH2"]`.
+  - `exclude_mp=True` drops MP-processed rows via `mp_events(...)`.
+  - `mp_source` selects which MP table to consult; default `"all"` reads
+    `data/all_mp_dates.csv` (the merged set), `"smartsheet"` reads the
+    raw `data/MPdates_smartsheet.csv`.
+- `mp_events(events, keep=False, source="all")` — filter against the
+  chosen MP table (match key `(cm, cav, YYYYMMDD)`). `keep=True` returns
+  only MP rows. Default `source="all"` matches `filter_events`.
+- `peak_quench_day_per_cavity(events, top_n=N, real_only=True, save_path=None)`
+  — per-cavity busiest days; returns columns
   `cm, cav, year, month, day, count, rank` (rank 1 = busiest, ties
-  broken by earliest date). Also writes
-  `data/peak_quench_days.csv`.
+  broken by earliest date). Writes a CSV only when `save_path` is given.
 - `print_peak_quench_day_summary(...)` — pretty-printed table of the
   same data.
 - `peak_days_not_in_mp(peak, mp_events_df)` — set-difference on
@@ -125,6 +138,34 @@ should be followed unless the user says otherwise in a specific request.
       ["cm","cav","year","month","day"], observed=True
   ).filter(lambda g: len(g) < THRESHOLD)
   ```
+  Prefer `filter_events(events, classification="real", exclude_hl=True,
+  exclude_mp=True)` for new code — it consults the curated MP table
+  rather than a count threshold, so genuine high-quench days survive.
+
+## MP-date data pipeline
+
+- `data/MPdates_smartsheet.csv` — raw MP log (columns `CM, CAV, date` with
+  date as `M/D/YY`). Treated as read-only input.
+- `data/peak_quench_days_top3.csv` — per-cavity top-3 busiest days that
+  *look* like MP processing but aren't in the smartsheet log. Hand-curated;
+  rows can be appended when new MP-style days are identified.
+- `data/real_quenches_over10_days.csv` — per-cavity high-count days that
+  are confirmed *real* quenches (not MP). These are explicitly excluded
+  from the merged MP set so plots that drop MP days still show them.
+- `data/all_mp_dates.csv` — merged output produced by
+  `build_all_mp_dates.py`. Schema `cm, cav, year, month, day, source`.
+  This is what `mp_events(..., source="all")` and `filter_events(...,
+  exclude_mp=True)` consult by default.
+- To add MP days that aren't in the smartsheet log, append to
+  `peak_quench_days_top3.csv` (do **not** edit `all_mp_dates.csv`
+  directly — `build_all_mp_dates.py` regenerates it from scratch).
+- To mark a high-count day as a real quench (so it survives MP exclusion),
+  add it to `real_quenches_over10_days.csv`. Don't put the same key in
+  both files — the rebuild excludes anything in `over10` from the merged
+  MP set.
+- `check_nomp_real.py` cross-checks the merged-MP filter against the
+  legacy `groupby(...).filter(len < 10)` heuristic; the only expected
+  diff is the rows in `real_quenches_over10_days.csv`.
 
 ## Driver script conventions (`hdf5_file_plot.py`)
 

@@ -1,6 +1,8 @@
 import os
+import pandas as pd
 
 from quench_data_summary import (
+    filter_events,
     load_quench_events,
     mp_events,
     peak_days_not_in_mp,
@@ -18,6 +20,7 @@ from quench_plots import (
     line_quenches_all_years,
     bar_quenches_per_cavity,
     bar_quenches_per_month,
+    line_quenches_by_section_over_time,
 )
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -32,45 +35,29 @@ print(f"Loaded {len(events)} quench events from {H5_GLOB}")
 # Physical cryomodule order: L0 (CM01), L1 (CM02-CM03), HL (CMH1-CMH2),
 # L2 (CM04-CM15), L3 (CM16-CM35). Every plot respects this layout.
 
-import pandas as pd
 CM_ORDER = ["CM01", "CM02", "CM03", "CMH1", "CMH2"] + [f"CM{n:02d}" for n in range(4, 36)]
 present = [cm for cm in CM_ORDER if cm in set(events["cm"])]
 events["cm"] = pd.Categorical(events["cm"], categories=present, ordered=True)
 #print(events.groupby("cm", observed=True).size())
+events_no_hl = filter_events(events, exclude_hl=True)
+real_events  = filter_events(events, classification="real", exclude_hl=True)
+# nompevents   = mp_events(real_events, keep=False)
+# onlympevents = mp_events(real_events, keep=True)
+# print(f"\nMP events: {len(onlympevents)}, non-MP events: {len(nompevents)}")
 
-real_events  = events[events["is_real"].astype(bool)]
-nompevents   = mp_events(real_events, keep=False)
-onlympevents = mp_events(real_events, keep=True)
-print(f"\nMP events: {len(onlympevents)}, non-MP events: {len(nompevents)}")
+# nomp_real = real_events.groupby(["cm", "cav", "year", "month", "day"], observed=True).filter(lambda g: len(g) < 10)
+# Same idea via the merged MP table (data/all_mp_dates.csv):
+nomp_nohl_real_all = filter_events(events, classification="real",
+                              exclude_hl=True, exclude_mp=True)
+# events2022 = real_events[real_events["year"] == "2022"]
 
-# # ----------------------------------------------------------------------- #
-# # Find days that *look* like MP (a cavity's busiest quench days) but are
-# # not recorded in MPdates.csv. These are candidate missing MP entries.
-# # ----------------------------------------------------------------------- #
-# PEAK_TOP_N = 2          # consider each cavity's top-N busiest days
-# PEAK_MIN_COUNT = 10     # only flag days with more than this many quenches
-# peakdf = peak_quench_day_per_cavity(real_events, top_n=PEAK_TOP_N, real_only=True)
-# candidates = peak_days_not_in_mp(peakdf, onlympevents)
-# candidates = candidates[candidates["count"] > PEAK_MIN_COUNT].reset_index(drop=True)
-# # candidates = candidates[~candidates["cm"].isin(["CM34", "CM35"])].reset_index(drop=True)
-
-# print(f"\nCandidate missing MP days "
-#       f"(top-{PEAK_TOP_N} per cavity, count > {PEAK_MIN_COUNT}):")
-# print(candidates.to_string(index=False))
-# candidates.to_csv(os.path.join(HERE, "data", "non_mp_peak_quench_days.csv"),
-#                   index=False)
-
-# No MP candidates: 
-nomp_real = real_events.groupby(["cm", "cav", "year", "month", "day"], observed=True).filter(lambda g: len(g) < 10)
-
-events2022 = real_events[real_events["year"] == "2022"]
-events2025 = real_events[real_events["year"] == "2025"]
 # ----------------------------------------------------------------------- #
 # Plot toggles. Flip True/False to turn individual plots on or off.
 # ----------------------------------------------------------------------- #
 PLOTS = {
     "box_real_slice_cm":    False,
-    "box_real_all":         False,
+    "box_all":              False,
+    "box_real_all":         True,
     "bar_all_per_cryo":     False,
     "bar_real_vs_false_stk": False,
     "bar_real_vs_false_grp": False,
@@ -79,9 +66,10 @@ PLOTS = {
     "pie_real_vs_false":     False,
     "bar_per_year":         False,
     "line_all_years":       False,
-    "bar_per_cavity":       True,
+    "bar_per_cavity":       False,
     "scatter_totals":       False,
     "bar_per_month":    False,
+    "line_section_time": True,
 }
 
 # Box plot: real quenches per cavity, slice of cryomodules
@@ -95,30 +83,39 @@ if PLOTS["box_real_slice_cm"]:
         ),
     )
 
-if PLOTS["box_real_all"]:
+if PLOTS["box_all"]:
     box_plot_quenches_per_cavity(
-        #nomp_real, classification="real",
-        events2022, classification="real",
+        events_no_hl, classification=None,
         log=True, annotate_totals=True, compact_label=True,
         section_dividers=True, font_size=20, figsize=(22, 7),
-        title="All real quench distributions per cryomodule (2022)",
-        save_path=os.path.join(IMG_DIR, "real_quench_distributions_per_cryo_all_2022.png"),
+        title="All quench distributions per cryomodule (2022-2025)",
+        save_path=os.path.join(IMG_DIR, "box_all_quench_distributions_per_cryo_no_hl.png"),
+    )
+
+if PLOTS["box_real_all"]:
+    box_plot_quenches_per_cavity(
+        nomp_nohl_real_all, classification="real",
+        #events2022, classification="real",
+        log=True, annotate_totals=True, compact_label=True,
+        section_dividers=True, font_size=20, figsize=(22, 7),
+        title="All real quench distributions per cryomodule (2022-2025)",
+        save_path=os.path.join(IMG_DIR, "box_all_real_quench_distributions_per_cryo_nohl_nomp.png"),
     )
 
 # All quenches per cryomodule
 if PLOTS["bar_all_per_cryo"]:
     bar_quenches_per_cryo(
-        nomp_real, section_colors=True,
+        nomp_nohl_real_all, section_colors=True,
         title="Number of quenches per cryomodule (2022-2025)",
-        save_path=os.path.join(IMG_DIR, "all_quench_counts_per_cryo_nomp.png"),
+        save_path=os.path.join(IMG_DIR, "bar_all_quench_counts_per_cryo_nomp.png"),
     )
 
 # Real and false stacked
 if PLOTS["bar_real_vs_false_stk"]:
     bar_real_vs_false_stacked(
-        events,
+        events_no_hl,
         title="Real vs false quenches per cryomodule (2022-2025)",
-        save_path=os.path.join(IMG_DIR, "real_vs_false_quenches_stacked.png"),
+        save_path=os.path.join(IMG_DIR, "real_vs_false_quenches_stacked_no_hl.png"),
     )
 
 # Real and false grouped, log scale, subset 5-10
@@ -180,6 +177,7 @@ if PLOTS["line_all_years"]:
     )
 
 # Per-cavity bar for each cryomodule
+events2025 = real_events[real_events["year"] == "2025"]
 cm34 = events2025[events2025["cm"] == "CM34"]
 cm35 = events2025[events2025["cm"] == "CM35"]
 cavity_events = cm34
@@ -200,6 +198,14 @@ if PLOTS["bar_per_month"]:
     bar_quenches_per_month(
         real_events, cm=cm, cav=cav, year=year,
         save_path=os.path.join(IMG_DIR, f"quenches_per_month_{cm}_{cav}_{year}.png"),
+    )
+
+# Per-section line over time (L0/L1/L2/L3, HL excluded)
+if PLOTS["line_section_time"]:
+    line_quenches_by_section_over_time(
+        nomp_nohl_real_all, sections=("L0", "L1", "L2", "L3"),
+        title="Real quenches per linac section over time (2022-2025)",
+        save_path=os.path.join(IMG_DIR, "real_quenches_by_section_over_time_nohl_nomp.png"),
     )
 
 

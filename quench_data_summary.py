@@ -8,34 +8,87 @@ import pandas as pd
 
 EVENT_COLS = ["source_file", "cm", "cav", "date", "year", "month", "day", "is_real"]
 
-MP = pd.read_csv(os.path.join(os.path.dirname(__file__), "data", "MPdates.csv"))
+# Cryomodules in the harmonic linac (HL) — sometimes excluded from
+# whole-machine plots since they sit between L1 and L2 physically.
+CMHLs = ["CMH1", "CMH2"]
 
 
-def _mp_keys():
-    """Return the set of (cm, cav, yyyymmdd) tuples that were MP-processed."""
-    cm = "CM" + MP["CM"].astype(int).astype(str).str.zfill(2)
-    cav = "CAV" + MP["CAV"].astype(int).astype(str)
-    # Dates in MPdates.csv look like "10/10/24"; normalize to "YYYYMMDD".
-    date = pd.to_datetime(MP["date"], format="%m/%d/%y").dt.strftime("%Y%m%d")
-    return set(zip(cm, cav, date))
+def filter_events(events, classification=None, exclude_hl=False,
+                  exclude_mp=True, mp_source="all"):
+    """Return a subset of ``events`` by classification, HL, and MP membership.
+
+    `classification`:
+      - None     -> keep all rows (real + false)
+      - "real"   -> keep rows where ``is_real`` is True
+      - "false"  -> keep rows where ``is_real`` is False
+    `exclude_hl`: if True, drop rows whose ``cm`` is in ``CMHLs``
+    (CMH1, CMH2). Default keeps them.
+    `exclude_mp`: if True, drop rows that match an entry in the chosen
+    MP table via ``mp_events(..., keep=False, source=mp_source)``.
+    `mp_source`: "all" (merged ``data/all_mp_dates.csv``, default) or
+    "sebastian" (raw input).
+    """
+    sub = events
+    if exclude_hl:
+        sub = sub[~sub["cm"].isin(CMHLs)]
+    if classification == "real":
+        sub = sub[sub["is_real"].astype(bool)]
+    elif classification == "false":
+        sub = sub[~sub["is_real"].astype(bool)]
+    elif classification is not None:
+        raise ValueError(
+            f"classification must be None, 'real', or 'false' (got {classification!r})"
+        )
+    if exclude_mp:
+        sub = mp_events(sub, keep=False, source=mp_source)
+    return sub.reset_index(drop=True)
 
 
-def mp_events(events, keep=False):
+MP = pd.read_csv(os.path.join(os.path.dirname(__file__), "data", "MPdates_smartsheet.csv"))
+ALL_MP_PATH = os.path.join(os.path.dirname(__file__), "data", "all_mp_dates.csv")
+
+
+def _mp_keys(source="all"):
+    """Return the set of (cm, cav, yyyymmdd) tuples that were MP-processed.
+
+    `source`:
+      - "all" (default): read from data/all_mp_dates.csv, the merged set
+        built by ``build_all_mp_dates.py``.
+      - "smartsheet": read from MPdates_smartsheet.csv (raw input).
+    """
+    if source == "all":
+        df = pd.read_csv(ALL_MP_PATH, dtype=str)
+        date = (df["year"].str.zfill(4)
+                + df["month"].str.zfill(2)
+                + df["day"].str.zfill(2))
+        return set(zip(df["cm"], df["cav"], date))
+    if source == "smartsheet":
+        cm = "CM" + MP["CM"].astype(int).astype(str).str.zfill(2)
+        cav = "CAV" + MP["CAV"].astype(int).astype(str)
+        # Dates in MPdates_smartsheet.csv look like "10/10/24"; Convert to normal YYYYMMDD format.
+        date = pd.to_datetime(MP["date"], format="%m/%d/%y").dt.strftime("%Y%m%d")
+        return set(zip(cm, cav, date))
+    raise ValueError(f"source must be 'smartsheet' or 'all' (got {source!r})")
+
+
+def mp_events(events, keep=False, source="all"):
     """Filter events by MP-processing membership.
 
     `keep`:
       - False (default): drop rows that match an MP entry.
       - True: keep only rows that match an MP entry.
+    `source`: which MP table to consult — "all" (merged
+    ``data/all_mp_dates.csv``, default) or "smartsheet" (raw input).
 
     Match key is ``(cm, cav, YYYYMMDD)``. Returns a new DataFrame.
     """
-    keys = _mp_keys()
-    day = events["date"].str[:8]
+    keys  = _mp_keys(source=source)
+    day   = events["date"].str[:8]
     in_mp = [k in keys for k in zip(events["cm"], events["cav"], day)]
-    mask = in_mp if keep else [not x for x in in_mp]
+    mask  = in_mp if keep else [not x for x in in_mp]
     return events[mask].reset_index(drop=True)
 
-def peak_quench_day_per_cavity(events, top_n=3, real_only=True):
+def peak_quench_day_per_cavity(events, top_n=3, real_only=True, save_path=None):
     """For each (cm, cav), return the ``top_n`` days with the most quenches.
 
     Returns a DataFrame with columns
@@ -43,7 +96,8 @@ def peak_quench_day_per_cavity(events, top_n=3, real_only=True):
     cm, cav, then rank. ``rank`` is 1 for the busiest day, 2 for the
     next busiest, etc. Ties are broken by the earliest date. Cavities
     with fewer than ``top_n`` distinct quench days return all available
-    days.
+    days. If ``save_path`` is given (filename or full path), the result
+    is also written to CSV. Bare filenames are placed in ``data/``.
     """
     df = events[events["is_real"]] if real_only else events
     daily = (
@@ -55,7 +109,10 @@ def peak_quench_day_per_cavity(events, top_n=3, real_only=True):
     )
     peak = daily.groupby(["cm", "cav"], observed=True).head(top_n).copy()
     peak["rank"] = peak.groupby(["cm", "cav"], observed=True).cumcount() + 1
-    peak.to_csv(os.path.join(os.path.dirname(__file__), "data", "peak_quench_days.csv"), index=False)
+    if save_path:
+        out = save_path if os.path.isabs(save_path) or os.path.dirname(save_path) \
+              else os.path.join(os.path.dirname(__file__), "data", save_path)
+        peak.to_csv(out, index=False)
     return peak.reset_index(drop=True)
 
 
@@ -136,9 +193,7 @@ def load_quench_waveforms(events, source):
         the ``cm``, ``cav``, ``date`` columns are used.
     source : same value passed to ``load_quench_events`` to build `events`.
 
-    Returns: dict[str, dict]
-        Keyed by ``"CM01/CAV1/YYYYMMDD_HHMMSS"``. Each value is
-        ``{"datasets": {label: np.ndarray, ...}, "attrs": {name: value, ...}}``.
+    Returns: dict keyed by ``"CM01/CAV1/YYYYMMDD_HHMMSS"``. 
     """
     if isinstance(events, pd.Series):
         events = events.to_frame().T
@@ -162,4 +217,23 @@ def load_quench_waveforms(events, source):
                             "attrs": {k: g.attrs[k] for k in g.attrs.keys()},
                         }
     return out
+
+
+# ----------------------------------------------------------------------- #
+# Find days that *look* like MP (a cavity's busiest quench days) but are
+# not recorded in MPdates.csv. These are candidate missing MP entries.
+# ----------------------------------------------------------------------- #
+# PEAK_TOP_N = 10          # consider each cavity's top-N busiest days
+# PEAK_MIN_COUNT = 10     # only flag days with more than this many quenches
+# cm33 = events[(events["cm"] == "CM33") & (~events["is_real"].astype(bool))]
+# peakdf = peak_quench_day_per_cavity(cm33, top_n=PEAK_TOP_N, real_only=False)
+# # candidates = peak_days_not_in_mp(peakdf, onlympevents)
+# # candidates = candidates[candidates["count"] > PEAK_MIN_COUNT].reset_index(drop=True)
+# # candidates = candidates[~candidates["cm"].isin(["CM34", "CM35"])].reset_index(drop=True)
+
+# print(f"\nCandidate missing MP days "
+#       f"(top-{PEAK_TOP_N} per cavity, count > {PEAK_MIN_COUNT}):")
+# print(peakdf.to_string(index=False))
+# peakdf.to_csv(os.path.join(HERE, "data", "non_mp_peak_quench_days_cm33.csv"),
+#                   index=False)
 

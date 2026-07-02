@@ -34,12 +34,10 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
     *   All csv files are located in config folder.
 
 3.  **Create and Activate the Conda Environment:**
-    Create the environment.
     ```bash
     conda create -n `<your-env-name>` python=3.10
     ```
 
-    Activate the environment.
     ```bash
     conda activate `<your-env-name>`
     ```
@@ -50,7 +48,7 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
     pip install numpy pandas h5py matplotlib scipy
     ```
     
-### Development Tools (Linting & Type Checking)
+### Development Tools
 This project uses Ruff for auto-formatting and mypy for strict type checking.
 
 ---
@@ -69,4 +67,3 @@ This project uses Ruff for auto-formatting and mypy for strict type checking.
     
 3.  **Find the Output:**
     The generated plot files will be saved in the images folder.
-    

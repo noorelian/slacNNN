@@ -1,0 +1,13 @@
+[tool.mypy]
+# This single line enables all the strictest checks!
+strict = true
+
+# This tells mypy not to complain about libraries that don't have type hints.
+[[tool.mypy.overrides]]
+module = [
+    "h5py.*",
+    "matplotlib.*",
+    "numpy.*",
+    "pandas.*"
+]
+ignore_missing_imports = true

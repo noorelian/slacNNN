@@ -1,0 +1,12 @@
+# --- Folders to Ignore ---
+data/
+images/
+
+# --- Python & Conda Specific Ignores ---
+.venv/
+slac-project/
+__pycache__/
+*.pyc
+
+# --- macOS Specific Ignores ---
+.DS_Store

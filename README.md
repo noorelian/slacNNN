@@ -13,7 +13,7 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
 
 1.  **Clone the Repository:**
     ```bash
-    git clone <URL_to_this_github_repo>
+    git clone '<URL_to_this_github_repo>'
     cd SLACPYTHON
     ```
 

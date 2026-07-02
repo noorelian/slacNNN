@@ -18,8 +18,6 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
     ```
 
 2.  **Set up the Directory Structure:**
-    This project requires a specific folder layout:
-    
     ```
     SLACPYTHON/
     ├── config/
@@ -34,13 +32,10 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
     *   All csv files are located in config folder.
 
 3.  **Create and Activate the Conda Environment:**
-    Create the environment.
     ```bash
     # Replace YOUR_ENV_NAME with your choice (e.g., slac_analysis)
     conda create -n YOUR_ENV_NAME python=3.10
     ```
-
-    Activate the environment.
     ```bash
     conda activate YOUR_ENV_NAME
     ```
@@ -51,7 +46,7 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
     pip install numpy pandas h5py matplotlib scipy
     ```
     
-### Development Tools (Linting & Type Checking)
+### Development Tools
 This project uses Ruff for auto-formatting and mypy for strict type checking.
 
 ---

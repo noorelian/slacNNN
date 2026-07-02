@@ -40,7 +40,6 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
     ```
 
 4.  **Install Required Python Packages:**
-    With your environment active, run the following command:
     ```bash
     pip install numpy pandas h5py matplotlib scipy
     ```

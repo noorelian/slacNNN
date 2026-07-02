@@ -10,7 +10,6 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
 ### Installation & Setup
 
 1.  **Set up the Directory Structure:**
-    This project requires a specific folder layout:
     ```
     SLACPYTHON/
     ├── config/
@@ -28,7 +27,9 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
     *   conda activate `<your-env-name>`
 
 3.  **Install Required Python Packages:**
-    *   With the `<your-env-name>` environment active, run the following command: pip install numpy pandas h5py matplotlib scipy
+    *   With the `<your-env-name>` environment active, run the following command: 
+    ```bash
+    pip install numpy pandas h5py matplotlib scipy
     
 ### Development Tools
 This project uses Ruff for auto-formatting and mypy for strict type checking.
@@ -37,12 +38,9 @@ This project uses Ruff for auto-formatting and mypy for strict type checking.
 
 1.  **Navigate into the script directory:**
     *   cd src
-    
-2.  **Select Plots:**
-    *   Open hdf5_file_plot.py in your editor. Change the boolean values from False to True for the plots you wish to generate.
 
-3.  **Run the script:**
-    *   python hdf5_file_plot.py
+2.  **Run the script:**
+    *   python `<python-script-file>`.py
     
-4.  **Find the Output:**
+3.  **Find the Output:**
     *   The generated plot files will be saved in the images folder.

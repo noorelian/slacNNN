@@ -33,7 +33,6 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
 
 3.  **Create and Activate the Conda Environment:**
     ```bash
-    # Replace YOUR_ENV_NAME with your choice (e.g., slac_analysis)
     conda create -n YOUR_ENV_NAME python=3.10
     ```
     ```bash

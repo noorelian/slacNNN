@@ -13,7 +13,7 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
 
 1.  **Clone the Repository:**
     ```bash
-    git clone '<URL_to_this_github_repo>'
+    git clone URL_TO_THIS_GITHUB_REPO
     cd SLACPYTHON
     ```
 
@@ -34,21 +34,24 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
     *   All csv files are located in config folder.
 
 3.  **Create and Activate the Conda Environment:**
+    Create the environment.
     ```bash
-    conda create -n `<your-env-name>` python=3.10
+    # Replace YOUR_ENV_NAME with your choice (e.g., slac_analysis)
+    conda create -n YOUR_ENV_NAME python=3.10
     ```
 
+    Activate the environment.
     ```bash
-    conda activate `<your-env-name>`
+    conda activate YOUR_ENV_NAME
     ```
 
 4.  **Install Required Python Packages:**
-    With the `<your-env-name>` environment active, run the following command:
+    With your environment active, run the following command:
     ```bash
     pip install numpy pandas h5py matplotlib scipy
     ```
     
-### Development Tools
+### Development Tools (Linting & Type Checking)
 This project uses Ruff for auto-formatting and mypy for strict type checking.
 
 ---
@@ -62,7 +65,7 @@ This project uses Ruff for auto-formatting and mypy for strict type checking.
     
 2.  **Run the script:**
     ```bash
-    python <python-script-file>.py
+    python YOUR_PYTHON_SCRIPT.py
     ```
     
 3.  **Find the Output:**

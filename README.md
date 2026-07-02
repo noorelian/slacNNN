@@ -37,7 +37,7 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
 ### Development Tools
 This project uses Ruff for auto-formatting and mypy for strict type checking.
 
-## Usage
+### Usage
 
 1.  **Navigate into the script directory:**
     *   cd src

@@ -4,8 +4,8 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
 
 ### Prerequisites
 
-*   Conda must be installed.
-*   You must have your raw .h5 quench data files.
+- Conda must be installed.
+- You must have your raw .h5 quench data files.
 
 ---
 
@@ -13,7 +13,7 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
 
 1.  **Clone the Repository:**
     ```bash
-    git clone URL_TO_THIS_GITHUB_REPO
+    git clone https://github.com/slaclab/slacq.git
     cd SLACPYTHON
     ```
 

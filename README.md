@@ -4,8 +4,8 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
 
 ### Prerequisites
 
-- Conda must be installed.
-- You must have your raw .h5 quench data files.
+- You must have your .h5 quench data files.
+- Conda install is recommended.
 
 ---
 
@@ -14,22 +14,21 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
 1.  **Clone the Repository:**
     ```bash
     git clone https://github.com/slaclab/slacq.git
-    cd SLACPYTHON
+    cd slacq
     ```
 
 2.  **Set up the Directory Structure:**
     ```
-    SLACPYTHON/
+    slacq/
     ├── config/
     ├── data/
     ├── images/
-    └── src/
+    └── plotter/
     ```
-    
-    *   Place all your .h5 data files into the data folder.
-    *   The images folder is where output plots will be automatically saved.
-    *   All python files are located in src folder.
-    *   All csv files are located in config folder.
+- Create a data directory and place your .h5 files in it.
+- All python files are located in plotter package.
+- All csv files containing multipacting dates are located in config directory.
+- The images directory is where output plots will be automatically saved.
 
 3.  **Create and Activate the Conda Environment:**
     ```bash
@@ -50,16 +49,11 @@ This project uses Ruff for auto-formatting and mypy for strict type checking.
 ---
 
 ## Usage
-
-1.  **Navigate into the script directory:**
+    
+1.  **Run the script:**
     ```bash
-    cd src
+    python generate_plots.py
     ```
     
-2.  **Run the script:**
-    ```bash
-    python YOUR_PYTHON_SCRIPT.py
-    ```
-    
-3.  **Find the Output:**
+2.  **Find the Output:**
     The generated plot files will be saved in the images folder.

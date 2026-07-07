@@ -1,5 +1,5 @@
 import pandas as pd
-from plotter.config import H5_GLOB
+from plotter.config import H5_GLOB, DataBundle
 from plotter.quench_data_summary import (
     filter_events,
     load_quench_events,
@@ -35,11 +35,9 @@ def load_data():
     )
     # events2022 = real_events[real_events["year"] == "2022"]
 
-    data_bundle = {
-        "all_events": events,
-        "events_no_hl": events_no_hl,
-        "real_events": real_events,
-        "nomp_nohl_real_all": nomp_nohl_real_all,
-    }
-
-    return data_bundle
+    return DataBundle(
+        all_events=events,
+        events_no_hl=events_no_hl,
+        real_events=real_events,
+        nomp_nohl_real_all=nomp_nohl_real_all,
+    )

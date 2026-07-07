@@ -14,13 +14,14 @@ from plotter.quench_plots import (
     line_quenches_by_section_over_time,
 )
 from plotter.config import IMG_DIR
+from plotter.config import DataBundle
 
 
-def plot_data(PLOTS: dict[str, str], data_bundle):
-    events = data_bundle["all_events"]
-    events_no_hl = data_bundle["events_no_hl"]
-    real_events = data_bundle["real_events"]
-    nomp_nohl_real_all = data_bundle["nomp_nohl_real_all"]
+def plot_data(PLOTS: dict[str, str], data_bundle: DataBundle):
+    events = data_bundle.all_events
+    events_no_hl = data_bundle.events_no_hl
+    real_events = data_bundle.real_events
+    nomp_nohl_real_all = data_bundle.nomp_nohl_real_all
 
     # Box plot: real quenches per cavity, slice of cryomodules
     if PLOTS["box_real_slice_cm"]:

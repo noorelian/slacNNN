@@ -6,7 +6,7 @@ from plotter.quench_data_summary import (
 )
 
 
-def prepare_data():
+def load_data():
 
     events = load_quench_events(H5_GLOB)
     # TODO: Add option to select year in this function

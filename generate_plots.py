@@ -2,8 +2,8 @@
 HDF5 Plotter main function
 """
 
-from plotter.hdf5_plotter import plot_data
-from plotter.load_data import prepare_data
+from plotter.plot_data import plot_data
+from plotter.load_data import load_data
 
 PLOTS = {
     "box_real_slice_cm": False,
@@ -25,7 +25,7 @@ PLOTS = {
 
 
 def main():
-    config = prepare_data()
+    config = load_data()
     plot_data(PLOTS, config)
 
 

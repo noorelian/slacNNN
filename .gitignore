@@ -1,9 +1,9 @@
 # --- Folders to Ignore ---
 data/
 images/
+**.vscode/
 
 # --- Python & Conda Specific Ignores ---
-.venv/
 slac-project/
 __pycache__/
 *.pyc

@@ -1,11 +1,11 @@
 import os
 import pandas as pd
 
-from src.quench_data_summary import (
+from plotter.quench_data_summary import (
     filter_events,
     load_quench_events,
 )
-from src.quench_plots import (
+from plotter.quench_plots import (
     box_plot_quenches_per_cavity,
     bar_quenches_per_cryo,
     bar_real_vs_false_stacked,

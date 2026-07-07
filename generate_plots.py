@@ -2,7 +2,7 @@
 HDF5 Plotter main function
 """
 
-from src.hdf5_file_plot import plot_data
+from plotter.hdf5_file_plot import plot_data
 
 PLOTS = {
     "box_real_slice_cm": False,

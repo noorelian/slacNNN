@@ -196,5 +196,3 @@ def plot_data(PLOTS: dict[str, str], data_bundle: DataBundle):
                 IMG_DIR, "real_quenches_by_section_over_time_nohl_nomp.png"
             ),
         )
-
-    pass

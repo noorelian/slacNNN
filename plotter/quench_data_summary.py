@@ -45,11 +45,12 @@ def filter_events(
     return sub.reset_index(drop=True)
 
 
+config_dir: str = "config"
 MP = pd.read_csv(
-    os.path.join(os.path.dirname(__file__), "..", "config", "MPdates_smartsheet.csv")
+    os.path.join(os.path.dirname(__file__), "..", config_dir, "MPdates_smartsheet.csv")
 )
 ALL_MP_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "config", "all_mp_dates.csv"
+    os.path.dirname(__file__), "..", config_dir, "all_mp_dates.csv"
 )
 
 

@@ -13,8 +13,8 @@ from plotter.quench_plots import (
     bar_quenches_per_month,
     line_quenches_by_section_over_time,
 )
-from plotter.config import IMG_DIR
-from plotter.config import DataBundle
+from utils.config import IMG_DIR
+from utils.config import DataBundle
 
 
 def plot_data(PLOTS: dict[str, str], data_bundle: DataBundle):

@@ -3,7 +3,7 @@ import pandas as pd
 import h5py  # type: ignore[import-untyped]
 import os
 import time
-from srf_waveforms import (
+from plotter.srf_waveforms import (
     load_fault_file,
     grab_common_data,
     validate_quench_lisa,
@@ -38,7 +38,7 @@ def _get_quench_filenames(lx):
     return sorted(quench_files)
 
 
-def load_quench_data(quench_files):
+def load_quench_data(quench_files) -> pd.DataFrame:
     """Load quench files and return DataFrame of all quench waveforms."""
     quench_data = []
     for filename in quench_files:

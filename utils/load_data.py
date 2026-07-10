@@ -1,6 +1,6 @@
 import pandas as pd
-from plotter.config import H5_GLOB, DataBundle
-from plotter.quench_data_summary import (
+from utils.config import H5_GLOB, DataBundle
+from utils.quench_data_summary import (
     filter_events,
     load_quench_events,
 )

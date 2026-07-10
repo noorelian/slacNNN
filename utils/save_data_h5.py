@@ -1,14 +1,18 @@
-import numpy as np
 import glob
 import pandas as pd
-import h5py
+import h5py  # type: ignore[import-untyped]
 import os
 import time
-from srf_waveforms import load_fault_file, grab_common_data, validate_quench_lisa, label_to_values
+from srf_waveforms import (
+    load_fault_file,
+    grab_common_data,
+    validate_quench_lisa,
+    label_to_values,
+)
 
 start_time = time.time()
 
-local = False #True
+local = False  # True
 if local:
     DATA_DIR = r"/Users/nneveu/Google Drive/My Drive/srf/q/"
     SAVE_DIR = "."
@@ -16,19 +20,23 @@ else:
     DATA_DIR = r"/mccfs2/u1/lcls/physics/rf_lcls2/fault_data/"
     SAVE_DIR = "/sdf/group/ad/org/lfd/sclp/data/"
 
+
 def _savefile_for_lx(lx):
     return os.path.join(SAVE_DIR, f"quench_data_L{lx}.h5")
 
-def _get_lx_dir(lx): 
+
+def _get_lx_dir(lx):
     """Get accelerating section, L0, L1, L2, or L3 directory."""
     lnum = f"{lx:1d}"
     return os.path.join(DATA_DIR, f"ACCL_L{lnum}B_*")
 
+
 def _get_quench_filenames(lx):
     """Get sorted quench files for Lx section."""
     lx_dir = _get_lx_dir(lx)
-    quench_files = glob.glob(os.path.join(lx_dir, '**', '*QUENCH.txt'), recursive=True)
+    quench_files = glob.glob(os.path.join(lx_dir, "**", "*QUENCH.txt"), recursive=True)
     return sorted(quench_files)
+
 
 def load_quench_data(quench_files):
     """Load quench files and return DataFrame of all quench waveforms."""
@@ -38,16 +46,18 @@ def load_quench_data(quench_files):
         quench_data.append(grab_common_data(df))
     return pd.concat(quench_data, ignore_index=True) if quench_data else pd.DataFrame()
 
+
 def save_filenames_to_txt(quench_files, output_txt):
     """Save list of quench filenames to a text file."""
-    with open(output_txt, 'w') as f:
+    with open(output_txt, "w") as f:
         for file in quench_files:
             f.write(f"{os.path.basename(file)}\n")
- 
+
+
 # --- Main execution block ---
-#TODO: add option to either loop through files or use pkl file. 
-# all_data = [] 
-# for lx in range(4): 
+# TODO: add option to either loop through files or use pkl file.
+# all_data = []
+# for lx in range(4):
 #     quench_files = _get_quench_filenames(lx)
 #     #save_filenames_to_txt(quench_files, output_txt)
 #     print(f"L{lx}: found {len(quench_files)} quench files")
@@ -55,11 +65,11 @@ def save_filenames_to_txt(quench_files, output_txt):
 # all_data  = pd.concat(all_data, ignore_index=True)
 # all_data.to_pickle(f"all_quench_data.pkl")
 
-all_data = pd.read_pickle(SAVE_DIR+"2026_all_quench_data.pkl")
+all_data = pd.read_pickle(SAVE_DIR + "2026_all_quench_data.pkl")
 
 for lx in range(4):
     lx_tag = f"ACCL_L{lx}B_"
-    lx_data = all_data[all_data['source_file'].str.contains(lx_tag, na=False)]
+    lx_data = all_data[all_data["source_file"].str.contains(lx_tag, na=False)]
     if lx_data.empty:
         print(f"L{lx}: no data, skipping")
         continue
@@ -67,31 +77,33 @@ for lx in range(4):
     savefile = _savefile_for_lx(lx)
     print(f"\nWriting L{lx} -> {savefile} ({len(lx_data)} rows)")
 
-    with h5py.File(savefile, 'w') as h5file:
-        for (cm, cav), cav_data in lx_data.groupby(["cryomodule", "cavity"], dropna=False):
-
+    with h5py.File(savefile, "w") as h5file:
+        for (cm, cav), cav_data in lx_data.groupby(
+            ["cryomodule", "cavity"], dropna=False
+        ):
             print(f"Processing CM{cm} CAV{cav}...")
-            cm_group     = h5file.require_group(f"CM{cm}")
-            cav_group    = cm_group.require_group(f"CAV{cav}")
-            quench_files = cav_data['source_file'].unique()
+            cm_group = h5file.require_group(f"CM{cm}")
+            cav_group = cm_group.require_group(f"CAV{cav}")
+            quench_files = cav_data["source_file"].unique()
 
             print(f"Data for CM{cm} CAV{cav} has {len(quench_files)} quench events.")
             for filename in quench_files:
-                quench_data = cav_data[cav_data['source_file'] == filename]
-                timestamp   = quench_data['file_date'].iloc[0]
+                quench_data = cav_data[cav_data["source_file"] == filename]
+                timestamp = quench_data["file_date"].iloc[0]
 
                 labeled_values = label_to_values(quench_data)
                 quench_group = cav_group.create_group(timestamp)
                 quench_result = validate_quench_lisa(quench_data)
-                quench_group.attrs['quench_classification'] = quench_result['is_real'] #boolean
-                quench_group.attrs['calculated_q_loaded']   = quench_result['loaded_q']
-                quench_group.attrs['other_issue']           = str(quench_result['other_issue'])
+                quench_group.attrs["quench_classification"] = quench_result[
+                    "is_real"
+                ]  # boolean
+                quench_group.attrs["calculated_q_loaded"] = quench_result["loaded_q"]
+                quench_group.attrs["other_issue"] = str(quench_result["other_issue"])
 
                 for label, values in labeled_values.items():
-                    if len(values)>1: # don't save freq and q again
+                    if len(values) > 1:  # don't save freq and q again
                         quench_group.create_dataset(label, data=values)
-                    elif label in ['frequency', 'saved_q_loaded']:
+                    elif label in ["frequency", "saved_q_loaded"]:
                         quench_group.attrs[label] = values[0]
 
 print(f"Total runtime: {time.time() - start_time:.2f} seconds")
-

@@ -1,20 +1,20 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import re # importing regular expression module
+import re  # importing regular expression module
 
 # changes with each file
-filename = 'ACCL_L3B_3180_20220630_164905_QUENCH.txt'   # imput data file
+filename = "ACCL_L3B_3180_20220630_164905_QUENCH.txt"  # imput data file
 
 # cavity details
-faultname = 'ACCL:L3B:3180:CAV:FLTAWF'      # PV or fault string to search for 
-timestamp = '2022-06-30_16:49:05.440831'    # precise timestamp of the waveform
+faultname = "ACCL:L3B:3180:CAV:FLTAWF"  # PV or fault string to search for
+timestamp = "2022-06-30_16:49:05.440831"  # precise timestamp of the waveform
 
-# read the entire file into memory
-with open(filename,'r') as file:
+# read the entire    file into memory
+with open(filename, "r") as file:
     lines = file.readlines()
 
-# initilization: find the section of interest based on keywords 
-start_line = None 
+# initilization: find the section of interest based on keywords
+start_line = None
 end_line = None
 data_lines = []
 
@@ -36,18 +36,20 @@ for i, line in enumerate(lines):
         break
     if in_section:
         # extracting just the part of the line that comes after the timestamp
-        data_part = line.split(timestamp, 1)[-1]    # removes the timestamp and label
-        data_lines.append(data_part.strip())        # extracting data lines
+        data_part = line.split(timestamp, 1)[-1]  # removes the timestamp and label
+        data_lines.append(data_part.strip())  # extracting data lines
 
 # extracting numeric data from each line using regular expressions
 data = []
 for line in data_lines:
     # using regex to find all numbers in the line
-    numbers = re.findall(r"[-+]?\d*\.\d+|\d+", line) #matches integers or floats
+    numbers = re.findall(r"[-+]?\d*\.\d+|\d+", line)  # matches integers or floats
     if numbers:
         # convering the first number found to float and add it to data list
         # data.append([float(num) for num in numbers])  # add all numbers in the line to data
-        data.extend([float(num) for num in numbers])    # flattening the data list (extend vs append)
+        data.extend(
+            [float(num) for num in numbers]
+        )  # flattening the data list (extend vs append)
     else:
         print(f"Skipping line with no numeric data: {line}")
 
@@ -63,7 +65,7 @@ else:
 print("=======================\n")
 
 # plotting the data if it is valid
-if data: 
+if data:
     # time axis assuming uniform spacing
     time = list(range(len(data)))
     # time = np.linspace(-0.04, 0.08, len(data))
@@ -80,18 +82,20 @@ if data:
         print(f"Data range: min = {data_min}, max = {data_max}")
 
         # plotting the data
-        plt.figure(figsize=(14,6))
-        plt.plot(time, data, label="Cavity", color='blue')
-        plt.xlabel('Number of Data Points')
-        plt.ylabel('MV')
-        plt.title(f'Quench Waveform {faultname} {timestamp}')
+        plt.figure(figsize=(14, 6))
+        plt.plot(time, data, label="Cavity", color="blue")
+        plt.xlabel("Number of Data Points")
+        plt.ylabel("MV")
+        plt.title(f"Quench Waveform {faultname} {timestamp}")
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
 
         # saving the figure
-        safe_faultname = search_string.replace(":", "_")    # search_string = f"{faultname} {timestamp}"
-        plot_filename = f"cavity_{filename.replace('.txt','')}.png"
+        safe_faultname = search_string.replace(
+            ":", "_"
+        )  # search_string = f"{faultname} {timestamp}"
+        plot_filename = f"cavity_{filename.replace('.txt', '')}.png"
         plt.savefig(plot_filename)
         print(f"Plot saved as: {plot_filename}")
 

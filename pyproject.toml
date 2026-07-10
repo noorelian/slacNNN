@@ -1,0 +1,24 @@
+[tool.mypy]
+# This single line enables all the strictest checks!
+strict = true
+
+# This tells mypy not to complain about libraries that don't have type hints.
+[[tool.mypy.overrides]]
+module = [
+    "h5py.*",
+    "matplotlib.*",
+    "numpy.*",
+    "pandas.*"
+]
+
+[project]
+name = "slac-project"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+ignore_missing_imports = true
+dependencies = [
+    "h5py>=3.16.0",
+    "matplotlib>=3.10.9",
+    "pandas>=2.3.3",
+]

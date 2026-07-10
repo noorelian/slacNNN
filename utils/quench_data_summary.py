@@ -1,7 +1,7 @@
 import glob
 import os
 
-import h5py
+import h5py  # type: ignore[import-untyped]
 import pandas as pd
 
 # The H5 files written by ``save_data_h5.py`` are the source of truth.
@@ -13,8 +13,9 @@ EVENT_COLS = ["source_file", "cm", "cav", "date", "year", "month", "day", "is_re
 CMHLs = ["CMH1", "CMH2"]
 
 
-def filter_events(events, classification=None, exclude_hl=False,
-                  exclude_mp=True, mp_source="all"):
+def filter_events(
+    events, classification=None, exclude_hl=False, exclude_mp=True, mp_source="all"
+):
     """Return a subset of ``events`` by classification, HL, and MP membership.
 
     `classification`:
@@ -44,8 +45,13 @@ def filter_events(events, classification=None, exclude_hl=False,
     return sub.reset_index(drop=True)
 
 
-MP = pd.read_csv(os.path.join(os.path.dirname(__file__), "data", "MPdates_smartsheet.csv"))
-ALL_MP_PATH = os.path.join(os.path.dirname(__file__), "data", "all_mp_dates.csv")
+config_dir: str = "config"
+MP = pd.read_csv(
+    os.path.join(os.path.dirname(__file__), "..", config_dir, "MPdates_smartsheet.csv")
+)
+ALL_MP_PATH = os.path.join(
+    os.path.dirname(__file__), "..", config_dir, "all_mp_dates.csv"
+)
 
 
 def _mp_keys(source="all"):
@@ -58,9 +64,9 @@ def _mp_keys(source="all"):
     """
     if source == "all":
         df = pd.read_csv(ALL_MP_PATH, dtype=str)
-        date = (df["year"].str.zfill(4)
-                + df["month"].str.zfill(2)
-                + df["day"].str.zfill(2))
+        date = (
+            df["year"].str.zfill(4) + df["month"].str.zfill(2) + df["day"].str.zfill(2)
+        )
         return set(zip(df["cm"], df["cav"], date))
     if source == "smartsheet":
         cm = "CM" + MP["CM"].astype(int).astype(str).str.zfill(2)
@@ -82,11 +88,12 @@ def mp_events(events, keep=False, source="all"):
 
     Match key is ``(cm, cav, YYYYMMDD)``. Returns a new DataFrame.
     """
-    keys  = _mp_keys(source=source)
-    day   = events["date"].str[:8]
+    keys = _mp_keys(source=source)
+    day = events["date"].str[:8]
     in_mp = [k in keys for k in zip(events["cm"], events["cav"], day)]
-    mask  = in_mp if keep else [not x for x in in_mp]
+    mask = in_mp if keep else [not x for x in in_mp]
     return events[mask].reset_index(drop=True)
+
 
 def peak_quench_day_per_cavity(events, top_n=3, real_only=True, save_path=None):
     """For each (cm, cav), return the ``top_n`` days with the most quenches.
@@ -102,16 +109,21 @@ def peak_quench_day_per_cavity(events, top_n=3, real_only=True, save_path=None):
     df = events[events["is_real"]] if real_only else events
     daily = (
         df.groupby(["cm", "cav", "year", "month", "day"], observed=True)
-          .size()
-          .reset_index(name="count")
-          .sort_values(["cm", "cav", "count", "year", "month", "day"],
-                       ascending=[True, True, False, True, True, True])
+        .size()
+        .reset_index(name="count")
+        .sort_values(
+            ["cm", "cav", "count", "year", "month", "day"],
+            ascending=[True, True, False, True, True, True],
+        )
     )
     peak = daily.groupby(["cm", "cav"], observed=True).head(top_n).copy()
     peak["rank"] = peak.groupby(["cm", "cav"], observed=True).cumcount() + 1
     if save_path:
-        out = save_path if os.path.isabs(save_path) or os.path.dirname(save_path) \
-              else os.path.join(os.path.dirname(__file__), "data", save_path)
+        out = (
+            save_path
+            if os.path.isabs(save_path) or os.path.dirname(save_path)
+            else os.path.join(os.path.dirname(__file__), "data", save_path)
+        )
         peak.to_csv(out, index=False)
     return peak.reset_index(drop=True)
 
@@ -127,8 +139,10 @@ def print_peak_quench_day_summary(events, top_n=3, real_only=True):
     print("  " + "-" * (len(header) - 2))
     for _, row in peak.iterrows():
         date = f"{int(row['year']):04d}-{int(row['month']):02d}-{int(row['day']):02d}"
-        print(f"  {row['cm']:<5} {row['cav']:<5} {int(row['rank']):<5} "
-              f"{date:<10} {int(row['count']):>6}")
+        print(
+            f"  {row['cm']:<5} {row['cav']:<5} {int(row['rank']):<5} "
+            f"{date:<10} {int(row['count']):>6}"
+        )
     return peak
 
 
@@ -139,13 +153,21 @@ def peak_days_not_in_mp(peak, mp_events_df):
     Useful for filtering peak-quench-day results down to days that were
     not MP-processed.
     """
-    keys = set(zip(mp_events_df["cm"], mp_events_df["cav"],
-                   mp_events_df["year"], mp_events_df["month"],
-                   mp_events_df["day"]))
-    mask = [(cm, cav, y, m, d) not in keys
-            for cm, cav, y, m, d in zip(peak["cm"], peak["cav"],
-                                        peak["year"], peak["month"],
-                                        peak["day"])]
+    keys = set(
+        zip(
+            mp_events_df["cm"],
+            mp_events_df["cav"],
+            mp_events_df["year"],
+            mp_events_df["month"],
+            mp_events_df["day"],
+        )
+    )
+    mask = [
+        (cm, cav, y, m, d) not in keys
+        for cm, cav, y, m, d in zip(
+            peak["cm"], peak["cav"], peak["year"], peak["month"], peak["day"]
+        )
+    ]
     return peak[mask].reset_index(drop=True)
 
 
@@ -172,16 +194,22 @@ def load_quench_events(source):
     rows = []
     for path in _resolve_paths(source):
         with h5py.File(path, "r") as f:
-            for cm in f:                            # "CM01"
-                for cav in f[cm]:                   # "CAV1"
-                    for ts in f[cm][cav]:           # "YYYYMMDD_HHMMSS"
+            for cm in f:  # "CM01"
+                for cav in f[cm]:  # "CAV1"
+                    for ts in f[cm][cav]:  # "YYYYMMDD_HHMMSS"
                         attrs = f[cm][cav][ts].attrs
-                        rows.append((
-                            f"{path}::{cm}/{cav}/{ts}",
-                            cm, cav, ts,
-                            ts[:4], ts[4:6], ts[6:8],
-                            bool(attrs.get("quench_classification", False)),
-                        ))
+                        rows.append(
+                            (
+                                f"{path}::{cm}/{cav}/{ts}",
+                                cm,
+                                cav,
+                                ts,
+                                ts[:4],
+                                ts[4:6],
+                                ts[6:8],
+                                bool(attrs.get("quench_classification", False)),
+                            )
+                        )
     return pd.DataFrame(rows, columns=EVENT_COLS)
 
 
@@ -193,7 +221,7 @@ def load_quench_waveforms(events, source):
         the ``cm``, ``cav``, ``date`` columns are used.
     source : same value passed to ``load_quench_events`` to build `events`.
 
-    Returns: dict keyed by ``"CM01/CAV1/YYYYMMDD_HHMMSS"``. 
+    Returns: dict keyed by ``"CM01/CAV1/YYYYMMDD_HHMMSS"``.
     """
     if isinstance(events, pd.Series):
         events = events.to_frame().T
@@ -236,4 +264,3 @@ def load_quench_waveforms(events, source):
 # print(peakdf.to_string(index=False))
 # peakdf.to_csv(os.path.join(HERE, "data", "non_mp_peak_quench_days_cm33.csv"),
 #                   index=False)
-

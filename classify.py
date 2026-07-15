@@ -30,8 +30,21 @@ class QuenchStatus(Enum):
     CAVITY_OFF = "CAVITY_OFF"
 
 
-def pre_quench_amplitude(quench_event_data: QuenchEvent) -> bool:
-    pre_quench_window = quench_event_data.fault_waveform[0:500]
+def find_quench_time(quench_event_data: QuenchEvent) -> int:
+    return int(np.searchsorted(quench_event_data.fault_time, 0.0))
+
+
+def pre_quench_amplitude(quench_event_data: QuenchEvent, time_0: int) -> bool:
+    """
+    Time period from start till quench.
+    Checks waveform always above threshold MV.
+    """
+    pre_quench_window = quench_event_data.fault_waveform[0:time_0]
+    threshold = 0.002
+
+# 1. The condition (fault_data < threshold) creates an array of [False, False, False, False, True]
+# 2. np.any() scans that array. If it sees even one 'True', it returns True!
+has_dropped_below = np.any(fault_data < threshold)
 
     pre_quench_avg = np.mean(pre_quench_window)
 
@@ -87,8 +100,10 @@ def load_all_quench_events(data_dir: str) -> Iterator[Tuple[str, QuenchEvent]]:
                         yield (event_id, QuenchEvent(**data_dict))
 
 
-def classify(event_data):
-    if not pre_quench_amplitude:
+def classify(event_data: QuenchEvent):
+    time_0: int = find_quench_time(event_data)
+
+    if not pre_quench_amplitude(event_data, time_0):
         return QuenchStatus.CAVITY_OFF
 
     # SWAP FOR YOUR CLASSIFY MAIN function TODO
@@ -120,6 +135,9 @@ def analyze_classification():
     3. Output result and falsely classified
     """
     pass
+
+
+# TO DO change name to QuenchData
 
 
 def main():

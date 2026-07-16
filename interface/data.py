@@ -1,26 +1,28 @@
-import h5py 
+import re
+from datetime import datetime
+
+import h5py
 import numpy as np
-from datetime import datetime 
 
 from constants import (
     SIGNAL_TIME_MAP,
-    FREQUENCY_KEYS,
-    SAVED_Q_LOADED_KEYS,
     LABELS,
     CHECKED,
     NOTE,
     CHECKED_AT,
-    NEED_SPECIALIST,
+    NEEDS_SPECIALIST,
+    LOADED_Q_CHANGE_FOR_QUENCH,
 )
+
 
 def get_scalar(group, keys):
     """
-    This function is used for extracting a scalar value from the h5 file 
+    Extract a scalar value from the h5 file, checking both datasets and attrs.
     """
     for key in keys:
         if key in group:
             try:
-                arr = np.array(group[keys])
+                arr = np.asarray(group[keys])
                 return float(arr.flat[0]) if arr.shape else float(arr)
             except Exception:
                 continue
@@ -34,73 +36,98 @@ def get_scalar(group, keys):
                 continue
     return None
 
-def find_event_groups(hddf5_file):
-    """This function is for finding each event groups/identifiers (decay ref, forward power, fault waveform) for each cm/cav/date, used for plotting """
+
+def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
+    """
+    A modified version of lisa's function.
+    Fits the exponential decay to the fault waveform after the fault,
+    estimates the loaded Q, and compares it to the saved loaded Q to give
+    a suggestion (Real or False).
+
+    A(t) = A0 * e^((-2 * pi * cav_freq * t)/(2 * loaded_Q)) = A0 * e ^ ((-pi * cav_freq * t)/loaded_Q)
+    ln(A(t)) = ln(A0) + ln(e ^ ((-pi * cav_freq * t)/loaded_Q)) = ln(A0) - ((pi * cav_freq * t)/loaded_Q)
+    polyfit(t, ln(A(t)), 1) = [-((pi * cav_freq)/loaded_Q), ln(A0)]
+    polyfit(t, ln(A0/A(t)), 1) = [(pi * f * t)/Ql]
+    https://education.molssi.org/python-data-analysis/03-data-fitting/index.html
+    """
+    other = None
+
+    time_data = np.asarray(time_data, dtype=float)
+    fault_data = np.asarray(fault_data, dtype=float)
+
+    time_0 = 0
+    # Look for time 0 (quench). These waveforms capture data beforehand
+    for time_0, timestamp in enumerate(time_data):
+        if timestamp >= 0:
+            break
+
+    fault_data = fault_data[time_0:]
+    time_data = time_data[time_0:]
+    end_decay = len(fault_data) - 1
+
+    # Find where the amplitude decays to "zero"
+    for end_decay, amp in enumerate(fault_data):
+        if amp < 0.002:
+            break
+
+    if end_decay <= 1:
+        other = "end_decay_not_found"
+        pre_quench_amp = fault_data[0]
+    else:
+        fault_data = fault_data[:end_decay]
+        time_data = time_data[:end_decay]
+        pre_quench_amp = fault_data[0]
+
+    try:
+        with np.errstate(divide="raise", invalid="raise"):
+            log_ratio = np.log(pre_quench_amp / fault_data)
+            exponential_term = np.polyfit(time_data, log_ratio, 1)[0]
+            loaded_q = (np.pi * frequency) / exponential_term
+    except (FloatingPointError, ZeroDivisionError):
+        return {"is_real": None, "loaded_q": np.nan, "other_issue": "divide_by_zero_or_invalid_value"}
+
+    thresh_for_quench = LOADED_Q_CHANGE_FOR_QUENCH * saved_q_loaded
+    is_real = bool(loaded_q < thresh_for_quench)
+    return {"is_real": is_real, "loaded_q": loaded_q, "other_issue": other}
+
+
+def find_event_groups(hdf5_file):
+    """Find each event group (cm/cav/date) that has plottable signals, for the dropdown."""
     events = []
- 
+
     def visitor(name, obj):
-        """ This function is for exploring the h5 file structure"""
         if isinstance(obj, h5py.Group):
             keys = set(obj.keys())
             if keys & set(SIGNAL_TIME_MAP.keys()):
                 events.append(name)
- 
-    hddf5_file.visititems(visitor)
+
+    hdf5_file.visititems(visitor)
     return sorted(events)
 
-def load_status(selected_path):
-    with h5py.File(selected_path, "r") as f:
-         events = find_event_groups(f)
-         event_status = {}
-         for event in events:
-             attrs = f[event].attrs
-             event_status[event] = {
-                "checked": bool(attrs.get(CHECKED, False)),
-                "label": attrs.get(LABELS, None),
-                "note": attrs.get(NOTE, None),
-                "checked_at": attrs.get(CHECKED_AT, None),
-                "needs_specialist": bool(attrs.get(NEED_SPECIALIST, False))
-             }
-    return events, event_status
 
-def load_signals(selected_path, event_path):
-    with h5py.File(selected_path, "r") as f:
-        group = f[event_path]
-        signal_data ={}
+def write_label(file_path, event_path, label, srf_note, needs_specialist):
+    """Write the label, note, and checked status to the hdf5 file for an event."""
+    note = srf_note.strip() if srf_note and srf_note.strip() else (
+        f"This event has been already checked and the waveform was labeled as {label.upper()}"
+    )
 
-        for signal_name, time_name in SIGNAL_TIME_MAP.items():
-            if signal_name not in group: # if an event is missing some attributes like the very first ones in 2022, skip the missing attributes 
-                continue
-
-            y = np.array(group[signal_name]) # load the signals(attributes) into array 
-            x = None 
-
-            if time_name in group:
-                t = np.array(group[time_name]) # load time data into array 
-                # only assign t to x if its shape matches that of y 
-                if t.shape[0] == y.shape[0]:
-                    x = t
-
-            if x is None:
-                x = np.arange(y.shape[0]) # if no time is available, create an x-axis starts from 0 to the length of y 
-
-        signal_data[signal_name] = (x, y)
-
-        frequency = get_scalar(group, FREQUENCY_KEYS) #read cavity frequency 
-        saved_q_loaded = get_scalar(group, SAVED_Q_LOADED_KEYS) #read the saved loaded Q
-    return  signal_data, frequency, saved_q_loaded
-
-def write_label(file_path, event_path, label, SRF_note, needs_specialist):
-    """ writing the label, note and checked status to the hdf5 file for each event (cm/cav/date) """
-    note = SRF_note.strip() if SRF_note and SRF_note.strip() else f"This event has been already checked and the waveform was labeled as {label.upper()}"
-
-    # open in append mode 
     with h5py.File(file_path, "a") as f:
         group = f[event_path]
         group.attrs[LABELS] = label
         group.attrs[CHECKED] = True
         group.attrs[NOTE] = note
         group.attrs[CHECKED_AT] = datetime.now().strftime("%Y-%m-%d")
-        group.attrs[NEED_SPECIALIST] = bool (needs_specialist)
+        group.attrs[NEEDS_SPECIALIST] = bool(needs_specialist)
 
 
+def parse_event_path(event_path):
+    """Turn 'CM.../CAV.../YYYYMMDD_HHMMSS' into a human-readable label."""
+    match = re.search(r"CM(\d+)/CAV(\d+)/(\d{8})_(\d{6})", event_path)
+    if match:
+        cm, cav, date_str, time_str = match.groups()
+        formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+        formatted_time = f"{time_str[:2]}:{time_str[2:4]}:{time_str[4:6]}"
+        return f"Cryomodule {int(cm)}, Cavity {int(cav)}  |  {formatted_date} {formatted_time}"
+    else:
+        print(f"Warning: Could not parse event path: {event_path}")
+        return event_path

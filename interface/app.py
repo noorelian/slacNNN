@@ -97,7 +97,7 @@ event_path = st.selectbox(
     f"Select event ({len(events)} found)",
     events,
     index=default_index,
-    format_func=checked_status(),
+    format_func=lambda p: checked_status(p, event_status),
     key="event_selectbox",
 )
 st.session_state["selected_event"] = event_path
@@ -220,28 +220,34 @@ SRF_note = st.text_area(
     key=f"note_{event_path}",
 )
 
+# A checkbox if there is a need for a specialist to check the cvaity in person 
 needs_specialist = st.checkbox(
     "Needs specialist to inpect the cavity in person",
     value=current_status["needs_specialist"],
     key=f"specilist_{event_path}",
 )
 
+# 3 colums fo the 3 options (real, false , other)
 col1, col2, col3 = st.columns(3)
 
 clicked_option = None
 
 with col1:
+    # set clicked_option = real if "REAL" was chosen
     if st.button("REAL", use_container_width=True):
         clicked_option = "real"
 
 with col2:
+    # set clicked_option = false if "FALSE" was chosen 
     if st.button("FALSE", use_container_width=True):
         clicked_option = "false"
 
 with col3:
+    # set the clicked_option = other if "OTHER" was chosen 
     if st.button("OTHER", use_container_width=True):
         clicked_option = "other"
 
+# if any option/button was clicked, update the label and the status of the event 
 if clicked_option:
     try:
         write_label(selected_path, event_path, clicked_option, SRF_note, needs_specialist)

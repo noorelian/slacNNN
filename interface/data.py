@@ -1,6 +1,5 @@
 import re
 from datetime import datetime
-
 import h5py
 import numpy as np
 
@@ -17,7 +16,8 @@ from constants import (
 
 def get_scalar(group, keys):
     """
-    Extract a scalar value from the h5 file, checking both datasets and attrs.
+    This function is used for extracting a scalar value from the h5 file 
+
     """
     for key in keys:
         if key in group:
@@ -39,16 +39,15 @@ def get_scalar(group, keys):
 
 def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
     """
-    A modified version of lisa's function.
-    Fits the exponential decay to the fault waveform after the fault,
-    estimates the loaded Q, and compares it to the saved loaded Q to give
-    a suggestion (Real or False).
-
+    A modified version of lisa's function
+    Fits the exponential decay to the fault waveform after the fault
+    estimate the loaded Q and compares it to the save loaded Q then gives a suggestion (Real or false )
     A(t) = A0 * e^((-2 * pi * cav_freq * t)/(2 * loaded_Q)) = A0 * e ^ ((-pi * cav_freq * t)/loaded_Q)
     ln(A(t)) = ln(A0) + ln(e ^ ((-pi * cav_freq * t)/loaded_Q)) = ln(A0) - ((pi * cav_freq * t)/loaded_Q)
     polyfit(t, ln(A(t)), 1) = [-((pi * cav_freq)/loaded_Q), ln(A0)]
     polyfit(t, ln(A0/A(t)), 1) = [(pi * f * t)/Ql]
     https://education.molssi.org/python-data-analysis/03-data-fitting/index.html
+
     """
     other = None
 
@@ -92,10 +91,11 @@ def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
 
 
 def find_event_groups(hdf5_file):
-    """Find each event group (cm/cav/date) that has plottable signals, for the dropdown."""
+    """This function is for finding each event groups/identifiers (decay ref, forward power, fault waveform) for each cm/cav/date, used for plotting """
     events = []
 
     def visitor(name, obj):
+        """ This function is for exploring the h5 file structure"""
         if isinstance(obj, h5py.Group):
             keys = set(obj.keys())
             if keys & set(SIGNAL_TIME_MAP.keys()):
@@ -106,7 +106,7 @@ def find_event_groups(hdf5_file):
 
 
 def write_label(file_path, event_path, label, srf_note, needs_specialist):
-    """Write the label, note, and checked status to the hdf5 file for an event."""
+    """ writing the label, note and checked status to the hdf5 file for each event (cm/cav/date) """
     note = srf_note.strip() if srf_note and srf_note.strip() else (
         f"This event has been already checked and the waveform was labeled as {label.upper()}"
     )
@@ -121,7 +121,7 @@ def write_label(file_path, event_path, label, srf_note, needs_specialist):
 
 
 def parse_event_path(event_path):
-    """Turn 'CM.../CAV.../YYYYMMDD_HHMMSS' into a human-readable label."""
+    """Turn 'CM/CAV/YYYYMMDD_HHMMSS' into a human readable label"""
     match = re.search(r"CM(\d+)/CAV(\d+)/(\d{8})_(\d{6})", event_path)
     if match:
         cm, cav, date_str, time_str = match.groups()

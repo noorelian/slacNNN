@@ -1,12 +1,9 @@
-
-
 import plotly.graph_objects as go
-
 from constants import STYLES, LINE_STYLES, MARKERS
 
 
 def plot_style(signal_name, x, y):
-    """Build the Plotly trace(s) for one signal, honoring STYLES config."""
+    """This function is responsible for plotting using markers, dash, line ...etc"""
     style = STYLES.get(signal_name, {})
     color = style.get("color")
     dash = LINE_STYLES.get(style.get("linestyle", "-"), "solid")
@@ -72,7 +69,7 @@ def plot_style(signal_name, x, y):
 
 
 def build_figure(signal_data, title):
-    """Build the full waveform figure from {signal_name: (x, y)} data."""
+    """Build the full figure from the signals data."""
     fig = go.Figure()
     for signal_name, (x, y) in signal_data.items():
         for trace in plot_style(signal_name, x, y):
@@ -92,7 +89,7 @@ def build_figure(signal_data, title):
 
 
 def extract_box_range(box_item):
-    """Pull an (x_range, y_range) pair out of a Plotly box-select event."""
+    """Pull an (x_range, y_range) pair out of a selected part of the event"""
     if "x0" in box_item and "x1" in box_item:
         return sorted([box_item["x0"], box_item["x1"]]), sorted([box_item["y0"], box_item["y1"]])
     if "range" in box_item:

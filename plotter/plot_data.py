@@ -17,7 +17,7 @@ from utils.config import IMG_DIR
 from utils.config import DataBundle
 
 
-def plot_data(PLOTS: dict[str, str], data_bundle: DataBundle):
+def plot_data(PLOTS: dict[str, bool], data_bundle: DataBundle):
     events = data_bundle.all_events
     events_no_hl = data_bundle.events_no_hl
     real_events = data_bundle.real_events

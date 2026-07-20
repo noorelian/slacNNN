@@ -5,7 +5,7 @@ HDF5 Plotter main function
 from plotter.plot_data import plot_data
 from utils.load_data import load_data
 
-PLOTS = {
+PLOTS: dict[str, bool] = {
     "box_real_slice_cm": True,
     "box_all": True,
     "box_real_all": True,

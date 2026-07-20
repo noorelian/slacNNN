@@ -3,7 +3,6 @@ import h5py  # type: ignore
 
 import numpy as np
 from dataclasses import dataclass, fields
-from typing import Optional
 from numpy.typing import NDArray
 from pathlib import Path
 from typing import Iterator, Tuple
@@ -34,27 +33,10 @@ def find_quench_time(quench_event_data: QuenchEvent) -> int:
 
 
 def pre_quench_amplitude(quench_event_data: QuenchEvent, time_0: int) -> bool:
-    """
-    Time period from start till quench.
-    Checks waveform always above threshold MV.
-    """
     pre_quench_window = quench_event_data.fault_waveform[0:time_0]
-    threshold = 0.002
-
-# 1. The condition (fault_data < threshold) creates an array of [False, False, False, False, True]
-# 2. np.any() scans that array. If it sees even one 'True', it returns True!
-has_dropped_below = np.any(fault_data < threshold)
-
-    pre_quench_avg = np.mean(pre_quench_window)
-
-    if pre_quench_avg >= 5.0:
-        #return True
-    else:
-        #return False
-
-
-def area():
-    pass
+    is_avg_sufficient = np.mean(pre_quench_window) >= 0.1
+    are_all_points_above_zero = np.all(pre_quench_window > 0.001)
+    return bool(is_avg_sufficient and are_all_points_above_zero)
 
 
 def exponential_decay_fit():
@@ -103,7 +85,7 @@ def classify(event_data: QuenchEvent):
         return QuenchStatus.CAVITY_OFF
 
     # SWAP FOR YOUR CLASSIFY MAIN function TODO
-    if area() and exponential_decay_fit() and power_spike_detection():
+    if exponential_decay_fit() and power_spike_detection():
         return QuenchStatus.REAL_QUENCH
 
     return QuenchStatus.FALSE_QUENCH

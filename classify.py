@@ -20,8 +20,7 @@ class QuenchEvent:
     forward_time: NDArray[np.float64]
     reverse_power: NDArray[np.float64]
     reverse_time: NDArray[np.float64]
-
-    decay_reference: Optional[NDArray[np.float64]] = None
+    decay_reference: NDArray[np.float64]
 
 
 class QuenchStatus(Enum):
@@ -49,9 +48,9 @@ has_dropped_below = np.any(fault_data < threshold)
     pre_quench_avg = np.mean(pre_quench_window)
 
     if pre_quench_avg >= 5.0:
-        return True
+        #return True
     else:
-        return False
+        #return False
 
 
 def area():
@@ -70,8 +69,6 @@ def load_all_quench_events(data_dir: str) -> Iterator[Tuple[str, QuenchEvent]]:
     folder = Path(data_dir)
 
     for h5_file in folder.glob("*.h5"):
-        # h5_file.stem gets the filename without the ".h5" extension
-        # e.g., "quench_data_L0"
         file_prefix = h5_file.stem
 
         with h5py.File(h5_file, "r") as f:
@@ -87,7 +84,6 @@ def load_all_quench_events(data_dir: str) -> Iterator[Tuple[str, QuenchEvent]]:
                         if not isinstance(event_group, h5py.Group):
                             continue
 
-                        # --- THE NEW UNIQUE ID ---
                         event_id = f"{file_prefix}-{cm_name}-{cav_name}-{timestamp}"
 
                         data_dict = {}

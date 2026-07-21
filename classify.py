@@ -1,14 +1,11 @@
 from enum import Enum
-import h5py  # type: ignore
 
 import numpy as np
 from dataclasses import dataclass, fields
 from numpy.typing import NDArray
+from typing import Iterator, Tuple, Optional, Dict, Any
 from pathlib import Path
-from typing import Iterator, Tuple, Optional
-import csv
-
-from utils.config import DATA_DIR
+import h5py
 
 
 @dataclass
@@ -75,6 +72,7 @@ def power_spike_detection():
     pass
 
 
+"""
 def load_all_quench_events(data_dir: str) -> Iterator[Tuple[str, QuenchData]]:
     folder = Path(data_dir)
 
@@ -104,6 +102,38 @@ def load_all_quench_events(data_dir: str) -> Iterator[Tuple[str, QuenchData]]:
                                     data_dict[field.name] = item[:]
 
                         yield (event_id, QuenchData(**data_dict))
+"""
+
+
+def load_specific_quench_events(data_dir: str) -> Iterator[Tuple[str, QuenchData]]:
+    folder = Path(data_dir)
+
+    for h5_file in folder.glob("*L0.h5"):
+        file_prefix = h5_file.stem
+
+        with h5py.File(h5_file, "r") as f:
+            cm_name = "CM01"
+            cav_name = "CAV1"
+
+            if cm_name not in f or cav_name not in f[cm_name]:  # type: ignore
+                continue
+
+            cav_group = f[cm_name][cav_name]  # type: ignore
+
+            for timestamp, event_group in cav_group.items():  # type: ignore
+                if not isinstance(event_group, h5py.Group):
+                    continue
+
+                event_id = f"{file_prefix}-{cm_name}-{cav_name}-{timestamp}"
+
+                data_dict = {}
+                for field in fields(QuenchData):
+                    if field.name in event_group:
+                        item = event_group[field.name]
+                        if isinstance(item, h5py.Dataset):
+                            data_dict[field.name] = item[:]
+
+                yield (event_id, QuenchData(**data_dict))
 
 
 def classify(event_data: QuenchData):
@@ -118,37 +148,59 @@ def classify(event_data: QuenchData):
     return QuenchStatus.FALSE
 
 
-def run_classification(events_iterator: Iterator[Tuple[str, QuenchData]]):
-    with open("classification_results.csv", mode="w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(["event", "classification"])
-        print("Processing events and writing to CSV...")
+def run_classification(
+    events_iterator: Iterator[Tuple[str, "QuenchData"]],
+) -> Dict[str, Any]:
+    classification_results = {}
 
-        for event_id, event_data in events_iterator:
-            label = classify(event_data)
-
-            writer.writerow([event_id, label])
-            print(f"Logged: {event_id} -> {label}")
-            break
+    for event_id, event_data in events_iterator:
+        label = classify(event_data)
+        classification_results[event_id] = label
+    return classification_results
 
 
-def analyze_classification():
-    """
-    Compare classification result of Algorithm vs labled dataset
-    1. Load labes.csv and classification_retult.csv
-    2. Compare all labels to the classification
-    3. Output result and falsely classified
-    """
-    pass
+def analyze_classification(
+    predictions: Dict[str, Any], ground_truth_file: Path
+) -> None:
+    correct = 0
+    total = 0
+
+    with h5py.File(ground_truth_file, "r") as f:
+        cm_name = "CM01"
+        cav_name = "CAV1"
+
+        if cm_name not in f or cav_name not in f[cm_name]:  # type: ignore
+            return
+
+        cav_group = f[cm_name][cav_name]  # type:ignore
+
+        for timestamp, event_group in cav_group.items():  # type: ignore
+            event_id = f"quench_data_L0-{cm_name}-{cav_name}-{timestamp}"
+
+            if event_id in predictions:
+                total += 1
+                predicted_label = predictions[event_id]
+                true_label = event_group.attrs.get("label")
+
+                if str(predicted_label) == str(true_label):
+                    correct += 1
+                else:
+                    print(
+                        f"Mismatch on {event_id} | Predicted: {predicted_label} | Actual: {true_label}"
+                    )
+
+    if total > 0:
+        accuracy = (correct / total) * 100
+        print(f"\nResults: {correct}/{total} correct ({accuracy:.2f}%)")
+    else:
+        print("\nWarning.")
 
 
-def main():
-    events_iterator: Iterator[Tuple[str, QuenchData]] = load_all_quench_events(DATA_DIR)
-    run_classification(events_iterator)
-
-    analyze_classification()
-
-    print("\nPipeline finished! Results saved to classification_results.csv")
+def main() -> None:
+    events_iterator = load_specific_quench_events("data")
+    prediction_results = run_classification(events_iterator)
+    labeled_file_path = Path("data") / "quench_data_L0_noor.h5"
+    analyze_classification(prediction_results, labeled_file_path)
 
 
 if __name__ == "__main__":

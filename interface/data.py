@@ -13,39 +13,6 @@ from constants import (
     LOADED_Q_CHANGE_FOR_QUENCH,
 )
 
-import os
-
-def list_subfolders(directory):
-    """Return sorted list of subfolder names in a directory."""
-    return sorted(
-        d for d in os.listdir(directory)
-        if os.path.isdir(os.path.join(directory, d))
-    )
-
-
-def list_h5_files(directory, extensions=(".h5", ".hdf5")):
-    """Return sorted list of HDF5 filenames in a directory."""
-    return sorted(
-        f for f in os.listdir(directory)
-        if f.lower().endswith(extensions)
-        and os.path.isfile(os.path.join(directory, f))
-    )
-
-
-def find_all_h5_files(base_dir, extensions=(".h5", ".hdf5")):
-    """Recursively find all HDF5 files under base_dir."""
-    matches = []
-    for dirpath, _, filenames in os.walk(base_dir):
-        for fn in filenames:
-            if fn.lower().endswith(extensions):
-                matches.append(os.path.join(dirpath, fn))
-    return sorted(matches)
-
-
-def is_within_directory(path, base_dir):
-    """Security check: ensure path stays inside base_dir."""
-    return os.path.realpath(path).startswith(os.path.realpath(base_dir))
-
 
 def get_scalar(group, keys):
     """
@@ -72,13 +39,12 @@ def get_scalar(group, keys):
 
 def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
     """
-    A modified version of lisa's function
-    Fits the exponential decay to the fault waveform after the fault
-    estimate the loaded Q and compares it to the save loaded Q then gives a suggestion (Real or false )
-    A(t) = A0 * e^((-2 * pi * cav_freq * t)/(2 * loaded_Q)) = A0 * e ^ ((-pi * cav_freq * t)/loaded_Q)
-    ln(A(t)) = ln(A0) + ln(e ^ ((-pi * cav_freq * t)/loaded_Q)) = ln(A0) - ((pi * cav_freq * t)/loaded_Q)
-    polyfit(t, ln(A(t)), 1) = [-((pi * cav_freq)/loaded_Q), ln(A0)]
-    polyfit(t, ln(A0/A(t)), 1) = [(pi * f * t)/Ql]
+    This function is responsible for suggesting whether an event is real or false, this is how it works:
+    - Trim the waveform to start at t = 0
+    - Trim the tail once the amplitude is < 0.002
+    - Fit ln(A0/A(t)) vs. time to a line; the slope gives the decay rate and loaded Q = (pi * frequency)/ slope
+    - Suggest Real if the loaded Q is < (LOADED_Q_CHANGE_FOR_QUENCH * saved_q_loaded), otherwise suggest False 
+   
     https://education.molssi.org/python-data-analysis/03-data-fitting/index.html
 
     """
@@ -123,15 +89,18 @@ def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
     return {"is_real": is_real, "loaded_q": loaded_q, "other_issue": other}
 
 def list_cryomodules(h5_file):
+    "This function is used for the events filter"
     return sorted(k for k in h5_file.keys() if re.fullmatch(r"CM\d+", k))
 
 
 def list_cavities(h5_file, cm):
+    "This function is used for the events filter"
     if cm not in h5_file:
         return []
     return sorted(k for k in h5_file[cm].keys() if re.fullmatch(r"CAV\d+", k))
 
 def list_years(h5_file, cm, cav):
+    "This function is used for the events filter"
     years = set()
     if cm in h5_file and cav in h5_file[cm]:
         for name in h5_file[cm][cav].keys():

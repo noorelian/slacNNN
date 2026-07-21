@@ -152,6 +152,7 @@ if not events:
     st.stop()
 
 def event_matches_label(event_path, target_label):
+    """This function is used for the label filter"""
     if target_label == "All":
         return True
     

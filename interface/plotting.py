@@ -80,8 +80,8 @@ def build_figure(signal_data, title):
         xaxis_title="Time (s)",
         yaxis_title="Amplitude",
         template="plotly_white",
-        width=700,
-        height=400,
+        width=800,
+        height=700,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         dragmode="select",
     )

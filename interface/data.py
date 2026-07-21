@@ -13,6 +13,39 @@ from constants import (
     LOADED_Q_CHANGE_FOR_QUENCH,
 )
 
+import os
+
+def list_subfolders(directory):
+    """Return sorted list of subfolder names in a directory."""
+    return sorted(
+        d for d in os.listdir(directory)
+        if os.path.isdir(os.path.join(directory, d))
+    )
+
+
+def list_h5_files(directory, extensions=(".h5", ".hdf5")):
+    """Return sorted list of HDF5 filenames in a directory."""
+    return sorted(
+        f for f in os.listdir(directory)
+        if f.lower().endswith(extensions)
+        and os.path.isfile(os.path.join(directory, f))
+    )
+
+
+def find_all_h5_files(base_dir, extensions=(".h5", ".hdf5")):
+    """Recursively find all HDF5 files under base_dir."""
+    matches = []
+    for dirpath, _, filenames in os.walk(base_dir):
+        for fn in filenames:
+            if fn.lower().endswith(extensions):
+                matches.append(os.path.join(dirpath, fn))
+    return sorted(matches)
+
+
+def is_within_directory(path, base_dir):
+    """Security check: ensure path stays inside base_dir."""
+    return os.path.realpath(path).startswith(os.path.realpath(base_dir))
+
 
 def get_scalar(group, keys):
     """
@@ -22,7 +55,7 @@ def get_scalar(group, keys):
     for key in keys:
         if key in group:
             try:
-                arr = np.asarray(group[keys])
+                arr = np.asarray(group[key])
                 return float(arr.flat[0]) if arr.shape else float(arr)
             except Exception:
                 continue
@@ -89,19 +122,60 @@ def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
     is_real = bool(loaded_q < thresh_for_quench)
     return {"is_real": is_real, "loaded_q": loaded_q, "other_issue": other}
 
+def list_cryomodules(h5_file):
+    return sorted(k for k in h5_file.keys() if re.fullmatch(r"CM\d+", k))
 
-def find_event_groups(hdf5_file):
+
+def list_cavities(h5_file, cm):
+    if cm not in h5_file:
+        return []
+    return sorted(k for k in h5_file[cm].keys() if re.fullmatch(r"CAV\d+", k))
+
+def list_years(h5_file, cm, cav):
+    years = set()
+    if cm in h5_file and cav in h5_file[cm]:
+        for name in h5_file[cm][cav].keys():
+            match = re.match (r"(\d{4})\d{4}_\d{6}", name)
+            if match:
+                years.add(match.group(1))
+    return sorted(years)
+
+def has_signal(group):
+    return bool(set(group.keys()) & set(SIGNAL_TIME_MAP.keys()))
+
+
+
+def find_event_groups(hdf5_file, cm=None, cav=None, year=None):
     """This function is for finding each event groups/identifiers (decay ref, forward power, fault waveform) for each cm/cav/date, used for plotting """
     events = []
+    def collect_from_cavity_group(cav_group, cav_path):
+        for name, obj in cav_group.items():
+            if not isinstance(obj, h5py.Group):
+                continue
+            if year and not name.startswith(year):
+                continue
+            if has_signal(obj):
+                events.append(f"{cav_path}/{name}")
+ 
+    if cm and cav:
+        if cm in hdf5_file and cav in hdf5_file[cm]:
+            collect_from_cavity_group(hdf5_file[cm][cav], f"{cm}/{cav}")
+    elif cm:
+        if cm in hdf5_file:
+            for cav_name in list_cavities(hdf5_file, cm):
+                collect_from_cavity_group(hdf5_file[cm][cav_name], f"{cm}/{cav_name}")
+    else:
 
-    def visitor(name, obj):
-        """ This function is for exploring the h5 file structure"""
-        if isinstance(obj, h5py.Group):
-            keys = set(obj.keys())
-            if keys & set(SIGNAL_TIME_MAP.keys()):
+        def visitor(name, obj):
+            """ This function is for exploring the h5 file structure"""
+            if isinstance(obj, h5py.Group) and has_signal(obj):
+                if year and not name.split("/")[-1].startswith(year):
+                    return
+                #keys = set(obj.keys())
+                #if keys & set(SIGNAL_TIME_MAP.keys()):
                 events.append(name)
 
-    hdf5_file.visititems(visitor)
+        hdf5_file.visititems(visitor)
     return sorted(events)
 
 

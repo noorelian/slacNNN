@@ -12,7 +12,7 @@ from utils.config import DATA_DIR
 
 
 @dataclass
-class QuenchEvent:
+class QuenchData:
     fault_time: NDArray[np.float64]
     fault_waveform: NDArray[np.float64]
     forward_power: NDArray[np.float64]
@@ -28,11 +28,11 @@ class QuenchStatus(Enum):
     OTHER = "OTHER"
 
 
-def find_quench_time(quench_event_data: QuenchEvent) -> int:
+def find_quench_time(quench_event_data: QuenchData) -> int:
     return int(np.searchsorted(quench_event_data.fault_time, 0.0))
 
 
-def pre_quench_amplitude(quench_event_data: QuenchEvent, time_0: int) -> bool:
+def pre_quench_amplitude(quench_event_data: QuenchData, time_0: int) -> bool:
     pre_quench_window = quench_event_data.fault_waveform[0:time_0]
     is_avg_sufficient = np.mean(pre_quench_window) >= 0.1
     are_all_points_above_zero = np.all(pre_quench_window > 0.001)
@@ -43,7 +43,7 @@ def pre_quench_amplitude(quench_event_data: QuenchEvent, time_0: int) -> bool:
     return bool(is_avg_sufficient and are_all_points_above_zero and is_fwd_power_on)
 
 
-def verify_tau_decay(quench_event_data: QuenchEvent, time_0: int) -> bool:
+def verify_tau_decay(quench_event_data: QuenchData, time_0: int) -> bool:
     decay_waveform = quench_event_data.fault_waveform[time_0:]
     decay_time = quench_event_data.fault_time[time_0:]
 
@@ -66,12 +66,16 @@ def verify_tau_decay(quench_event_data: QuenchEvent, time_0: int) -> bool:
     return bool(abs(t2 - expected_t2) <= tolerance)
 
 
+def exponential_fit():
+    pass
+
+
 # TODO: Add function for reverse power spikes. - Look into more! Use derivative or something? Spikes to more than 40% we can say something else is going on?
 def power_spike_detection():
     pass
 
 
-def load_all_quench_events(data_dir: str) -> Iterator[Tuple[str, QuenchEvent]]:
+def load_all_quench_events(data_dir: str) -> Iterator[Tuple[str, QuenchData]]:
     folder = Path(data_dir)
 
     for h5_file in folder.glob("*.h5"):
@@ -93,16 +97,16 @@ def load_all_quench_events(data_dir: str) -> Iterator[Tuple[str, QuenchEvent]]:
                         event_id = f"{file_prefix}-{cm_name}-{cav_name}-{timestamp}"
 
                         data_dict = {}
-                        for field in fields(QuenchEvent):
+                        for field in fields(QuenchData):
                             if field.name in event_group:
                                 item = event_group[field.name]
                                 if isinstance(item, h5py.Dataset):
                                     data_dict[field.name] = item[:]
 
-                        yield (event_id, QuenchEvent(**data_dict))
+                        yield (event_id, QuenchData(**data_dict))
 
 
-def classify(event_data: QuenchEvent):
+def classify(event_data: QuenchData):
     time_0: int = find_quench_time(event_data)
 
     if not pre_quench_amplitude(event_data, time_0):
@@ -114,7 +118,7 @@ def classify(event_data: QuenchEvent):
     return QuenchStatus.FALSE
 
 
-def run_classification(events_iterator: Iterator[Tuple[str, QuenchEvent]]):
+def run_classification(events_iterator: Iterator[Tuple[str, QuenchData]]):
     with open("classification_results.csv", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["event", "classification"])
@@ -138,13 +142,8 @@ def analyze_classification():
     pass
 
 
-# TO DO change name to QuenchData
-
-
 def main():
-    events_iterator: Iterator[Tuple[str, QuenchEvent]] = load_all_quench_events(
-        DATA_DIR
-    )
+    events_iterator: Iterator[Tuple[str, QuenchData]] = load_all_quench_events(DATA_DIR)
     run_classification(events_iterator)
 
     analyze_classification()

@@ -20,9 +20,9 @@ class QuenchData:
 
 
 class QuenchStatus(Enum):
-    REAL = "REAL"
-    FALSE = "FALSE"
-    OTHER = "OTHER"
+    real = "real"
+    false = "false"
+    other = "other"
 
 
 def find_quench_time(quench_event_data: QuenchData) -> int:
@@ -32,12 +32,11 @@ def find_quench_time(quench_event_data: QuenchData) -> int:
 def pre_quench_amplitude(quench_event_data: QuenchData, time_0: int) -> bool:
     pre_quench_window = quench_event_data.fault_waveform[0:time_0]
     is_avg_sufficient = np.mean(pre_quench_window) >= 0.1
-    are_all_points_above_zero = np.all(pre_quench_window > 0.001)
 
     pre_quench_fwd_power = quench_event_data.forward_power[0:time_0]
-    is_fwd_power_on = np.mean(pre_quench_fwd_power) > 0.1
+    is_fwd_power_on = np.mean(pre_quench_fwd_power) > 0.01
 
-    return bool(is_avg_sufficient and are_all_points_above_zero and is_fwd_power_on)
+    return bool(is_avg_sufficient and is_fwd_power_on)
 
 
 def verify_tau_decay(quench_event_data: QuenchData, time_0: int) -> bool:
@@ -140,12 +139,12 @@ def classify(event_data: QuenchData):
     time_0: int = find_quench_time(event_data)
 
     if not pre_quench_amplitude(event_data, time_0):
-        return QuenchStatus.OTHER
+        return QuenchStatus.other
 
     if verify_tau_decay(event_data, time_0):
-        return QuenchStatus.REAL
+        return QuenchStatus.real
 
-    return QuenchStatus.FALSE
+    return QuenchStatus.false
 
 
 def run_classification(
@@ -164,6 +163,7 @@ def analyze_classification(
 ) -> None:
     correct = 0
     total = 0
+    debug_counter = 0
 
     with h5py.File(ground_truth_file, "r") as f:
         cm_name = "CM01"
@@ -178,22 +178,45 @@ def analyze_classification(
             event_id = f"quench_data_L0-{cm_name}-{cav_name}-{timestamp}"
 
             if event_id in predictions:
-                total += 1
-                predicted_label = predictions[event_id]
-                true_label = event_group.attrs.get("label")
+                # --- SANITY CHECK BLOCK ---
+                if debug_counter < 3:
+                    print("\n--- MATCH VERIFICATION ---")
+                    print(f"Timestamp folder in Noor's file: {timestamp}")
+                    print(f"Reconstructed Event ID:          {event_id}")
+                    print(f"Prediction we found in memory:   {predictions[event_id]}")
+                    print(
+                        f"Label we found in attributes:    {event_group.attrs.get('quench_labels')}"
+                    )
+                    print("--------------------------")
+                    debug_counter += 1
+                # --------------------------
 
-                if str(predicted_label) == str(true_label):
+                total += 1
+                predicted_enum = predictions[event_id]
+
+                predicted_val = (
+                    predicted_enum.value
+                    if hasattr(predicted_enum, "value")
+                    else str(predicted_enum)
+                )
+
+                true_val = event_group.attrs.get("quench_labels")
+
+                if isinstance(true_val, bytes):
+                    true_val = true_val.decode("utf-8")
+
+                if str(predicted_val).strip() == str(true_val).strip():
                     correct += 1
                 else:
                     print(
-                        f"Mismatch on {event_id} | Predicted: {predicted_label} | Actual: {true_label}"
+                        f"Mismatch on {event_id} | Predicted: {predicted_val} | Actual: {true_val}"
                     )
 
     if total > 0:
         accuracy = (correct / total) * 100
         print(f"\nResults: {correct}/{total} correct ({accuracy:.2f}%)")
     else:
-        print("\nWarning.")
+        print("\nWarning: No matching events found.")
 
 
 def main() -> None:

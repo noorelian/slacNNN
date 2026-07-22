@@ -4,9 +4,9 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 
-from constants import SIGNAL_TIME_MAP, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS
+from quench_config import SIGNAL_TIME_MAP, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS, LABEL_DISPLAY_TO_STORED
 
-from data import (
+from h5_reader import (
     get_scalar,
     suggest_classification,
     find_event_groups,
@@ -23,13 +23,26 @@ from plotting import build_figure, extract_box_range
 st.set_page_config(page_title="Quench Labeler", layout="wide")
 st.title("Plot a Waveform/Quench")
 
+def normalize_label(label):
+    """Normalize any label to a canonical form so case, spaces, and
+    underscores never matter. 'NOT SURE', 'not_sure', 'Not Sure' all match."""
+    if label is None:
+        return ""
+    if isinstance(label, bytes):
+        label = label.decode()
+    label = str(label).strip().lower()         
+    label = label.replace(" ", "_")             
+    return label
+
 # A helper function that is responsible for the status of the file in the dropdown
 def checked_status(event_path, event_status):
     """Format an event's dropdown label: name | checked | label."""
     status = event_status[event_path]
     event_name = parse_event_path(event_path)
     if status["checked"]:
-        return f"{event_name}   |   Checked: Yes    |   Label: {status['label'].upper()}"
+        label = normalize_label(status["label"])
+        label = label.upper() if label else "UNLABELED"
+        return f"{event_name}   |   Checked: Yes    |   Label: {label}"
     return f"{event_name}   |   Checked: No |   Label: unlabeled"
 
 
@@ -37,9 +50,17 @@ def checked_status(event_path, event_status):
 def format_event_status(event_path, status):
     """Render an event's status as a markdown table."""
     checked = "Yes" if status["checked"] else "No"
-    label = status["label"].upper() if status["label"] else "Unlabeled"
-    note = status["note"] if status["note"] else "None"
+    label = normalize_label(status["label"])
+    label = label.upper() if label else "Unlabeled"
+
+    note = status["note"] 
+    if isinstance(note, bytes):
+        note = note.decode()
+    note = note if note else "None"
     when = status["checked_at"] if status["checked_at"] else ""
+    if isinstance(when, bytes):
+        when = when.decode()
+
     flag = "Yes" if status["needs_specialist"] else "No"
 
     display_name = parse_event_path(event_path).replace("|", "\\|")
@@ -130,7 +151,7 @@ with filter_col3:
     selected_year = st.selectbox("Year", year_options, key="filter_year", disabled=(selected_cm == "All" or selected_cav == "All"))
 
 with filter_col4:
-    label_options = ["All", "REAL", "FALSE", "OTHER", "Unlabeled"]
+    label_options = ["All", "REAL", "FALSE", "OTHER", "Unlabeled", "NOT SURE", "CAVITY OFF"]
     selected_option = st.selectbox("Label", label_options, key="filter_label")
 
 cm_filter = selected_cm if selected_cm != "All" else None
@@ -157,17 +178,15 @@ def event_matches_label(event_path, target_label):
         return True
     
     status = event_status[event_path]
-    label = status["label"]
-
-    if isinstance(label, bytes):
-        label = label.decode()
-    if label:
-        label = str(label).strip()
+    label = normalize_label(status["label"])
 
     if target_label == "Unlabeled":
         return(not status["checked"]) or (not label)
     
-    return label == target_label
+    target = LABEL_DISPLAY_TO_STORED.get(target_label.upper(), target_label)
+    target = normalize_label(target)
+    
+    return label == target
 
 if selected_option != "All":
     events = [e for e in events if event_matches_label(e, selected_option)]
@@ -189,7 +208,7 @@ event_path = st.selectbox(
     events,
     index=default_index,
     format_func=lambda p: checked_status(p, event_status),
-    key="event_selectbox_{st.session_state['data_version']}",
+    key=f"event_selectbox_{cm_filter}_{cav_filter}_{year_filter}_{selected_option}",
 )
 st.session_state["selected_event"] = event_path
 
@@ -206,15 +225,15 @@ with h5py.File(selected_path, "r") as f:
     group = f[event_path]
     signal_data = {}
 
-    for signal_name, time_name in SIGNAL_TIME_MAP.items():
+    for signal_name, time in SIGNAL_TIME_MAP.items():
         if signal_name not in group:  # if an event is missing some signals like the very first ones in 2022 (they are missing the decay reference), skip the missing items 
             continue
 
         y = np.array(group[signal_name])    # load the signals into array 
         x = None
 
-        if time_name in group:
-            t = np.array(group[time_name])  # load time data into array 
+        if time in group:
+            t = np.array(group[time])  # load time data into array 
             # only assign t to x if its shape matches that of y 
             if t.shape[0] == y.shape[0]:
                 x = t
@@ -304,7 +323,6 @@ if suggestion is not None:  # if the classification was computed
 else:
     st.info("Data is unavailable")  # if classificatin couldn't get computed
 
-existing_note = current_status["note"] if current_status["note"] else ""
 SRF_note = st.text_area(
     "Add a note (optional), If you decide to leave it blank, a generated note will be used.",
     value="",
@@ -319,7 +337,7 @@ needs_specialist = st.checkbox(
 )
 
 # 3 colums fo the 3 options (real, false , other)
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 clicked_option = None
 
@@ -338,10 +356,14 @@ with col3:
     if st.button("OTHER", use_container_width=True):
         clicked_option = "other"
 
-#with col4:
-    # set clicked_option = not_sure if "NOT SURE" was chosen
-    #if st.button("NOT SURE", use_container_width=True):
-       # clicked_option = "not sure"
+with col4:
+    #set clicked_option = not_sure if "NOT SURE" was chosen
+    if st.button("NOT SURE", use_container_width=True):
+       clicked_option = "not_sure"
+
+with col5:
+    if st.button("Cavity Off", use_container_width=True):
+       clicked_option = "cavity_off"
 
 # if any option/button was clicked, update the label and the status of the event 
 if clicked_option:

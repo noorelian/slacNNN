@@ -25,6 +25,15 @@ STYLES = {
 LINE_STYLES = {"-": "solid", "--": "dash", ":": "dot", "-.": "dashdot"}
 MARKERS = {"o": "circle", "x": "x", "s": "square", "^": "triangle-up", "d": "diamond"}
 
+LABEL_DISPLAY_TO_STORED = {
+    "REAL": "real",
+    "FALSE": "false",
+    "OTHER": "other",
+    "NOT SURE": "not_sure",
+    "CAVITY OFF": "cavity_off",
+    "UNLABELED": "",
+}
+
 # the attributes used for lableing the events 
 LABELS = "quench_labels" # REAL, FALSE OR OTHER 
 CHECKED = "checked" # checked or unchecked(True or false)

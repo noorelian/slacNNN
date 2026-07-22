@@ -3,7 +3,7 @@ from datetime import datetime
 import h5py
 import numpy as np
 
-from constants import (
+from quench_config import (
     SIGNAL_TIME_MAP,
     LABELS,
     CHECKED,
@@ -151,7 +151,7 @@ def find_event_groups(hdf5_file, cm=None, cav=None, year=None):
 def write_label(file_path, event_path, label, srf_note, needs_specialist):
     """ writing the label, note and checked status to the hdf5 file for each event (cm/cav/date) """
     note = srf_note.strip() if srf_note and srf_note.strip() else (
-        f"This event has been already checked and the waveform was labeled as {label.upper()}"
+        f"This event has been already checked and the waveform was labeled as {label}"
     )
 
     with h5py.File(file_path, "a") as f:

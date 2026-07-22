@@ -1,3 +1,4 @@
+## This is old plotting file from DESY / Sonya.
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk

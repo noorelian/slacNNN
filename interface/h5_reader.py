@@ -3,7 +3,7 @@ from datetime import datetime
 import h5py
 import numpy as np
 
-from constants import (
+from quench_config import (
     SIGNAL_TIME_MAP,
     LABELS,
     CHECKED,
@@ -22,7 +22,7 @@ def get_scalar(group, keys):
     for key in keys:
         if key in group:
             try:
-                arr = np.asarray(group[keys])
+                arr = np.asarray(group[key])
                 return float(arr.flat[0]) if arr.shape else float(arr)
             except Exception:
                 continue
@@ -39,13 +39,12 @@ def get_scalar(group, keys):
 
 def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
     """
-    A modified version of lisa's function
-    Fits the exponential decay to the fault waveform after the fault
-    estimate the loaded Q and compares it to the save loaded Q then gives a suggestion (Real or false )
-    A(t) = A0 * e^((-2 * pi * cav_freq * t)/(2 * loaded_Q)) = A0 * e ^ ((-pi * cav_freq * t)/loaded_Q)
-    ln(A(t)) = ln(A0) + ln(e ^ ((-pi * cav_freq * t)/loaded_Q)) = ln(A0) - ((pi * cav_freq * t)/loaded_Q)
-    polyfit(t, ln(A(t)), 1) = [-((pi * cav_freq)/loaded_Q), ln(A0)]
-    polyfit(t, ln(A0/A(t)), 1) = [(pi * f * t)/Ql]
+    This function is responsible for suggesting whether an event is real or false, this is how it works:
+    - Trim the waveform to start at t = 0
+    - Trim the tail once the amplitude is < 0.002
+    - Fit ln(A0/A(t)) vs. time to a line; the slope gives the decay rate and loaded Q = (pi * frequency)/ slope
+    - Suggest Real if the loaded Q is < (LOADED_Q_CHANGE_FOR_QUENCH * saved_q_loaded), otherwise suggest False 
+   
     https://education.molssi.org/python-data-analysis/03-data-fitting/index.html
 
     """
@@ -89,26 +88,70 @@ def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
     is_real = bool(loaded_q < thresh_for_quench)
     return {"is_real": is_real, "loaded_q": loaded_q, "other_issue": other}
 
+def list_cryomodules(h5_file):
+    "This function is used for the events filter"
+    return sorted(k for k in h5_file.keys() if re.fullmatch(r"CM\d+", k))
 
-def find_event_groups(hdf5_file):
+
+def list_cavities(h5_file, cm):
+    "This function is used for the events filter"
+    if cm not in h5_file:
+        return []
+    return sorted(k for k in h5_file[cm].keys() if re.fullmatch(r"CAV\d+", k))
+
+def list_years(h5_file, cm, cav):
+    "This function is used for the events filter"
+    years = set()
+    if cm in h5_file and cav in h5_file[cm]:
+        for name in h5_file[cm][cav].keys():
+            match = re.match (r"(\d{4})\d{4}_\d{6}", name)
+            if match:
+                years.add(match.group(1))
+    return sorted(years)
+
+def has_signal(group):
+    return bool(set(group.keys()) & set(SIGNAL_TIME_MAP.keys()))
+
+
+
+def find_event_groups(hdf5_file, cm=None, cav=None, year=None):
     """This function is for finding each event groups/identifiers (decay ref, forward power, fault waveform) for each cm/cav/date, used for plotting """
     events = []
+    def collect_from_cavity_group(cav_group, cav_path):
+        for name, obj in cav_group.items():
+            if not isinstance(obj, h5py.Group):
+                continue
+            if year and not name.startswith(year):
+                continue
+            if has_signal(obj):
+                events.append(f"{cav_path}/{name}")
+ 
+    if cm and cav:
+        if cm in hdf5_file and cav in hdf5_file[cm]:
+            collect_from_cavity_group(hdf5_file[cm][cav], f"{cm}/{cav}")
+    elif cm:
+        if cm in hdf5_file:
+            for cav_name in list_cavities(hdf5_file, cm):
+                collect_from_cavity_group(hdf5_file[cm][cav_name], f"{cm}/{cav_name}")
+    else:
 
-    def visitor(name, obj):
-        """ This function is for exploring the h5 file structure"""
-        if isinstance(obj, h5py.Group):
-            keys = set(obj.keys())
-            if keys & set(SIGNAL_TIME_MAP.keys()):
+        def visitor(name, obj):
+            """ This function is for exploring the h5 file structure"""
+            if isinstance(obj, h5py.Group) and has_signal(obj):
+                if year and not name.split("/")[-1].startswith(year):
+                    return
+                #keys = set(obj.keys())
+                #if keys & set(SIGNAL_TIME_MAP.keys()):
                 events.append(name)
 
-    hdf5_file.visititems(visitor)
+        hdf5_file.visititems(visitor)
     return sorted(events)
 
 
 def write_label(file_path, event_path, label, srf_note, needs_specialist):
     """ writing the label, note and checked status to the hdf5 file for each event (cm/cav/date) """
     note = srf_note.strip() if srf_note and srf_note.strip() else (
-        f"This event has been already checked and the waveform was labeled as {label.upper()}"
+        f"This event has been already checked and the waveform was labeled as {label}"
     )
 
     with h5py.File(file_path, "a") as f:

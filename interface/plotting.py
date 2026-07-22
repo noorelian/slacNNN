@@ -1,5 +1,5 @@
 import plotly.graph_objects as go
-from constants import STYLES, LINE_STYLES, MARKERS
+from quench_config import STYLES, LINE_STYLES, MARKERS
 
 
 def plot_style(signal_name, x, y):
@@ -26,7 +26,7 @@ def plot_style(signal_name, x, y):
                 line=dict(color=color, dash=dash, width=width),
             )
         )
-        markevery = style.get("markevery", 1)
+        markevery = max(style.get("markevery", 1), 1)
         traces.append(
             go.Scatter(
                 x=x[::markevery],
@@ -81,9 +81,10 @@ def build_figure(signal_data, title):
         yaxis_title="Amplitude",
         template="plotly_white",
         width=700,
-        height=400,
+        height=700,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         dragmode="select",
+        uirevision=title,
     )
     return fig
 

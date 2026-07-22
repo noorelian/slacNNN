@@ -4,19 +4,35 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 
-from constants import SIGNAL_TIME_MAP, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS
-from data import (
+from quench_config import SIGNAL_TIME_MAP, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS, LABEL_DISPLAY_TO_STORED
+
+from h5_reader import (
     get_scalar,
     suggest_classification,
     find_event_groups,
     write_label,
     parse_event_path,
+    list_cryomodules,
+    list_cavities,
+    list_years,
 )
+
 from plotting import build_figure, extract_box_range
+
 
 st.set_page_config(page_title="Quench Labeler", layout="wide")
 st.title("Plot a Waveform/Quench")
 
+def normalize_label(label):
+    """Normalize any label to a canonical form so case, spaces, and
+    underscores never matter. 'NOT SURE', 'not_sure', 'Not Sure' all match."""
+    if label is None:
+        return ""
+    if isinstance(label, bytes):
+        label = label.decode()
+    label = str(label).strip().lower()         
+    label = label.replace(" ", "_")             
+    return label
 
 # A helper function that is responsible for the status of the file in the dropdown
 def checked_status(event_path, event_status):
@@ -24,7 +40,9 @@ def checked_status(event_path, event_status):
     status = event_status[event_path]
     event_name = parse_event_path(event_path)
     if status["checked"]:
-        return f"{event_name}   |   Checked: Yes    |   Label: {status['label'].upper()}"
+        label = normalize_label(status["label"])
+        label = label.upper() if label else "UNLABELED"
+        return f"{event_name}   |   Checked: Yes    |   Label: {label}"
     return f"{event_name}   |   Checked: No |   Label: unlabeled"
 
 
@@ -32,9 +50,17 @@ def checked_status(event_path, event_status):
 def format_event_status(event_path, status):
     """Render an event's status as a markdown table."""
     checked = "Yes" if status["checked"] else "No"
-    label = status["label"] if status["label"] else "unlabeled"
-    note = status["note"] if status["note"] else "None"
+    label = normalize_label(status["label"])
+    label = label.upper() if label else "Unlabeled"
+
+    note = status["note"] 
+    if isinstance(note, bytes):
+        note = note.decode()
+    note = note if note else "None"
     when = status["checked_at"] if status["checked_at"] else ""
+    if isinstance(when, bytes):
+        when = when.decode()
+
     flag = "Yes" if status["needs_specialist"] else "No"
 
     display_name = parse_event_path(event_path).replace("|", "\\|")
@@ -49,6 +75,39 @@ def format_event_status(event_path, status):
     | **Last updated**                      | {when}                              |
     """
 
+@st.cache_data(show_spinner=False)
+def cached_cryomodules(path, mtime):
+    with h5py.File(path, "r") as f:
+        return list_cryomodules(f)
+ 
+ 
+@st.cache_data(show_spinner=False)
+def cached_cavities(path, mtime, cm):
+    with h5py.File(path, "r") as f:
+        return list_cavities(f, cm)
+ 
+ 
+@st.cache_data(show_spinner=False)
+def cached_years(path, mtime, cm, cav):
+    with h5py.File(path, "r") as f:
+        return list_years(f, cm, cav)
+ 
+ 
+@st.cache_data(show_spinner=False)
+def cached_events(path, mtime, cm, cav, year):
+    with h5py.File(path, "r") as f:
+        events = find_event_groups(f, cm=cm, cav=cav, year=year)
+        event_status = {}
+        for event in events:
+            attrs = f[event].attrs
+            event_status[event] = {
+                "checked": bool(attrs.get("checked", False)),
+                "label": attrs.get("quench_labels", None),
+                "note": attrs.get("note", None),
+                "checked_at": attrs.get("checked_at", None),
+                "needs_specialist": bool(attrs.get("needs_specialist", False)),
+            }
+    return events, event_status
 
 # ** File Selection **
 selected_path = st.text_input("Enter the full HDF5 File Path", value="")    # Getting the HDF5 file path from the user 
@@ -63,27 +122,78 @@ if not os.path.isfile(selected_path):
     st.error(f"File not found: {selected_path}")
     st.stop()
 
+file_mtime = os.path.getmtime(selected_path)
+
 try:
-    with h5py.File(selected_path, "r") as f:
-        events = find_event_groups(f)
-        event_status = {}
-        for event in events:
-            attrs = f[event].attrs
-            event_status[event] = {
-                "checked": bool(attrs.get("checked", False)),
-                "label": attrs.get("quench_labels", None),
-                "note": attrs.get("note", None),
-                "checked_at": attrs.get("checked_at", None),
-                "needs_specialist": bool(attrs.get("needs_specialist", False)),
-            }
+    cm_options = ["All"] + cached_cryomodules(selected_path, file_mtime)
 except Exception as e:
-    st.error(f"Could not open file as HDF5: {e}")   # throw an exception if the file is not a valid HDF5 file and stop 
+    st.error(f"Could not open the file: {e}")
     st.stop()
 
-# if no events were found, it will give you a warning message then close the file and stop
-if not events:
-    st.warning("No recognizable quench events found in this file.")
+filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
+
+with filter_col1:
+    selected_cm = st.selectbox("Cryomodule", cm_options, key="filter_cm")
+
+cav_options =["All"]
+
+if selected_cm != "All":
+    cav_options += cached_cavities(selected_path, file_mtime, selected_cm)
+
+with filter_col2:
+    selected_cav = st.selectbox("Cavity", cav_options, key="filter_cav", disabled=(selected_cm == "All"))
+
+year_options = ["All"]
+if selected_cm != "All" and selected_cav != "All":
+    year_options += cached_years(selected_path, file_mtime, selected_cm, selected_cav)
+
+with filter_col3:
+    selected_year = st.selectbox("Year", year_options, key="filter_year", disabled=(selected_cm == "All" or selected_cav == "All"))
+
+with filter_col4:
+    label_options = ["All", "REAL", "FALSE", "OTHER", "Unlabeled", "NOT SURE", "CAVITY OFF"]
+    selected_option = st.selectbox("Label", label_options, key="filter_label")
+
+cm_filter = selected_cm if selected_cm != "All" else None
+cav_filter = selected_cav if selected_cav != "All" else None
+year_filter = selected_year if selected_year != "All" else None
+
+if cm_filter is None:
+    st.caption("Narrow down by cryomodule, cavity, year and label for a faster and more focused set of events")
+
+try:
+    events, event_status = cached_events(selected_path, file_mtime, cm_filter, cav_filter, year_filter)
+
+except Exception as e:
+    st.error(f"Could not read events from the h5 file: {e}")
     st.stop()
+
+if not events:
+    st.warning("No recognizable quench events found")
+    st.stop()
+
+def event_matches_label(event_path, target_label):
+    """This function is used for the label filter"""
+    if target_label == "All":
+        return True
+    
+    status = event_status[event_path]
+    label = normalize_label(status["label"])
+
+    if target_label == "Unlabeled":
+        return(not status["checked"]) or (not label)
+    
+    target = LABEL_DISPLAY_TO_STORED.get(target_label.upper(), target_label)
+    target = normalize_label(target)
+    
+    return label == target
+
+if selected_option != "All":
+    events = [e for e in events if event_matches_label(e, selected_option)]
+
+    if not events:
+        st.warning("No events found with this label")
+        st.stop()
 
 
 # ** Event selection **
@@ -98,7 +208,7 @@ event_path = st.selectbox(
     events,
     index=default_index,
     format_func=lambda p: checked_status(p, event_status),
-    key="event_selectbox",
+    key=f"event_selectbox_{cm_filter}_{cav_filter}_{year_filter}_{selected_option}",
 )
 st.session_state["selected_event"] = event_path
 
@@ -115,15 +225,15 @@ with h5py.File(selected_path, "r") as f:
     group = f[event_path]
     signal_data = {}
 
-    for signal_name, time_name in SIGNAL_TIME_MAP.items():
+    for signal_name, time in SIGNAL_TIME_MAP.items():
         if signal_name not in group:  # if an event is missing some signals like the very first ones in 2022 (they are missing the decay reference), skip the missing items 
             continue
 
         y = np.array(group[signal_name])    # load the signals into array 
         x = None
 
-        if time_name in group:
-            t = np.array(group[time_name])  # load time data into array 
+        if time in group:
+            t = np.array(group[time])  # load time data into array 
             # only assign t to x if its shape matches that of y 
             if t.shape[0] == y.shape[0]:
                 x = t
@@ -202,7 +312,7 @@ st.subheader("Label this waveform")
 # Printing the classification 
 if suggestion is not None:  # if the classification was computed
     if suggestion["other_issue"] is not None and suggestion["is_real"] is None: #if failed, display a warning message 
-        st.warning(f"Could not provide a suggested classification ({suggestion['other_issue']})")
+        st.error(f"Could not provide a suggested classification ({suggestion['other_issue']})")
     else:
         suggested_label = "REAL" if suggestion["is_real"] else "FALSE"
         q_text = f"{suggestion['loaded_q']:.3e}" if np.isfinite(suggestion["loaded_q"]) else "N/A"
@@ -213,7 +323,6 @@ if suggestion is not None:  # if the classification was computed
 else:
     st.info("Data is unavailable")  # if classificatin couldn't get computed
 
-existing_note = current_status["note"] if current_status["note"] else ""
 SRF_note = st.text_area(
     "Add a note (optional), If you decide to leave it blank, a generated note will be used.",
     value="",
@@ -228,7 +337,7 @@ needs_specialist = st.checkbox(
 )
 
 # 3 colums fo the 3 options (real, false , other)
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 clicked_option = None
 
@@ -247,10 +356,21 @@ with col3:
     if st.button("OTHER", use_container_width=True):
         clicked_option = "other"
 
+with col4:
+    #set clicked_option = not_sure if "NOT SURE" was chosen
+    if st.button("NOT SURE", use_container_width=True):
+       clicked_option = "not_sure"
+
+with col5:
+    if st.button("Cavity Off", use_container_width=True):
+       clicked_option = "cavity_off"
+
 # if any option/button was clicked, update the label and the status of the event 
 if clicked_option:
     try:
         write_label(selected_path, event_path, clicked_option, SRF_note, needs_specialist)
+        st.success(f"Saved: '{event_path}' marked as **{clicked_option.upper()}** and checked.") 
+        cached_events.clear()
         st.rerun()
     except Exception as e:
         st.error(f"Could not write label to file: {e}")

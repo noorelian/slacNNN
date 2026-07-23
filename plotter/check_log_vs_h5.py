@@ -15,7 +15,8 @@ from collections import defaultdict
 
 import pandas as pd
 
-from quench_data_summary import load_quench_events
+from utils.quench_data_summary import load_quench_events
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOG_PATH = os.path.join(HERE, "data", "20260510_error_log.txt")
@@ -46,8 +47,10 @@ def main():
     diff["delta"] = diff["h5"] - diff["log"]
 
     print(diff.to_string())
-    print(f"\nTotals: log={int(diff['log'].sum())} h5={int(diff['h5'].sum())} "
-          f"delta={int(diff['delta'].sum())}")
+    print(
+        f"\nTotals: log={int(diff['log'].sum())} h5={int(diff['h5'].sum())} "
+        f"delta={int(diff['delta'].sum())}"
+    )
 
     mismatched = diff[diff["delta"] != 0]
     if mismatched.empty:

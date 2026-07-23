@@ -3,9 +3,11 @@ import pandas as pd
 from dataclasses import dataclass
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
 
-H5_GLOB = os.path.join(HERE, "..", "data", "quench_data_L*.h5")
-IMG_DIR = os.path.join(HERE, "..", "images")
+H5_GLOB = os.path.join(ROOT, "data", "quench_data_L*.h5")
+DATA_DIR: str = os.path.join(ROOT, "data")
+IMG_DIR = os.path.join(ROOT, "images")
 
 os.makedirs(IMG_DIR, exist_ok=True)
 

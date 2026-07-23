@@ -1,3 +1,10 @@
+POWER_SIGNALS = {
+   "forward_power",
+   "reverse_power",
+}
+
+#MW_TO_KW = 1000.0
+HEADROOM =  1.30        # 30% white space above the peak
 
 SIGNAL_TIME_MAP = {
     "forward_power": "forward_time",

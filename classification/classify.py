@@ -69,11 +69,9 @@ def analyze_classification(
 
 
 def main() -> None:
-    # Use the loader, which now gets the directory from config.DATA_DIR
     events_iterator = load_specific_quench_events()
     prediction_results = run_classification(events_iterator)
 
-    # Safely construct the path using the imported DATA_DIR
     labeled_file_path = Path(DATA_DIR) / "quench_data_L0_noor.h5"
     analyze_classification(prediction_results, labeled_file_path)
 

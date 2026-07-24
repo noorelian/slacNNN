@@ -3,7 +3,7 @@ import pandas as pd
 import h5py  # type: ignore[import-untyped]
 import os
 import time
-from plotter.srf_waveforms import (
+from utils.srf_waveforms import (
     load_fault_file,
     grab_common_data,
     validate_quench_lisa,

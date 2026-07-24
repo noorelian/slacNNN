@@ -6,6 +6,7 @@ from typing import Iterator, Tuple
 from utils.config import DATA_DIR
 from .models import QuenchData
 
+
 """
 def load_all_quench_events() -> Iterator[Tuple[str, QuenchData]]:
     folder = Path(DATA_DIR)
@@ -66,3 +67,5 @@ def load_specific_quench_events() -> Iterator[Tuple[str, QuenchData]]:
                             data_dict[field.name] = item[:]
 
                 yield (event_id, QuenchData(**data_dict))
+
+

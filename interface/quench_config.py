@@ -12,6 +12,8 @@ SIGNAL_TIME_MAP = {
     "fault_waveform": "fault_time",
     "decay_reference": "forward_time",  
 }
+
+LABEL_OPTIONS = ["All", "REAL", "FALSE", "OTHER", "Unlabeled", "NOT SURE", "CAVITY OFF"]
 # Styles for the plot
 STYLES = {
    'fault_waveform':  {'color': 'indigo', 'linestyle': '-',  'linewidth': 3, 'alpha': 1.0,
@@ -31,6 +33,14 @@ STYLES = {
 #fig, ax = plt.subplots(figsize=(7, 3.5))
 LINE_STYLES = {"-": "solid", "--": "dash", ":": "dot", "-.": "dashdot"}
 MARKERS = {"o": "circle", "x": "x", "s": "square", "^": "triangle-up", "d": "diamond"}
+
+LABEL_BUTTONS = [
+    ("REAL", "real"),
+    ("FALSE", "false"),
+    ("OTHER", "other"),
+    ("NOT SURE", "not_sure"),
+    ("Cavity Off", "cavity_off"),
+]
 
 LABEL_DISPLAY_TO_STORED = {
     "REAL": "real",

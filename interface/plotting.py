@@ -129,7 +129,7 @@ def build_figure(signal_data, title):
        ),
       
        template="plotly_white",
-       width=700,
+       width=900,
        height=700,
        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
        dragmode="select",

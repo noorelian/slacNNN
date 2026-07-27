@@ -1,5 +1,5 @@
 import numpy as np
-from .models import QuenchData, QuenchStatus
+from .data_loader import QuenchData, QuenchStatus
 
 
 def find_quench_time(quench_event_data: QuenchData) -> int:

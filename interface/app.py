@@ -1,22 +1,24 @@
-import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import os
+import sys
 import h5py
 import numpy as np
+
 import streamlit as st
 import plotly.graph_objects as go
-
-from quench_config import SIGNAL_TIME_MAP, LABEL_OPTIONS, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS, LABEL_BUTTONS, LABEL_DISPLAY_TO_STORED
+import streamlit as st
 
 from h5_reader import (
     get_scalar,
     suggest_classification,
-    find_event_groups,
     write_label,
     parse_event_path,
+    find_event_groups,
 )
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.quench_data_summary import list_cryomodules, list_cavities, list_years
 from plotting import build_figure, extract_box_range
+from quench_config import SIGNAL_TIME_MAP, LABEL_OPTIONS, LABEL_BUTTONS, LABEL_DISPLAY_TO_STORED, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS
 
 
 def to_string(value):
@@ -209,6 +211,7 @@ def event_matches_label(event_path, event_status, target_label):
     return label == target
 
 def filter_events_by_label(events, event_status, label):
+    """This function is used to filter events by label"""
     if label == "All":
         return events
     
@@ -221,6 +224,7 @@ def filter_events_by_label(events, event_status, label):
 
 # ** Event selection **
 def select_waveform_event(events, event_status, filter_key):
+    """Select events from the dropdown."""
     if ("selected_event" in st.session_state and st.session_state["selected_event"] in events):
         default_index = events.index(st.session_state["selected_event"])
     else:
@@ -247,7 +251,7 @@ def show_event_status(event_path, current_status):
 
 # ** Load waveform data for the selected event **
 def load_signal_data(group):
-
+    """Load signals data (decay_ref, fault_waveform, forward_power, reverse_power)."""
     signal_data = {}
 
     for signal_name, time in SIGNAL_TIME_MAP.items():
@@ -273,6 +277,7 @@ def load_signal_data(group):
 
 # ** Classification suggestion **
 def load_event_data_for_classification(path, event_path):
+    """load frequency and saved_Q for computing the classsification suggestion"""
     with h5py.File(path, "r") as f:
         group = f[event_path]
         signal_data = load_signal_data(group)
@@ -282,6 +287,7 @@ def load_event_data_for_classification(path, event_path):
 
 
 def compute_suggestion(signal_data, frequency, saved_q_loaded):
+    """Compute the classification suggestion"""
     if ("fault_waveform" not in signal_data or frequency is None or saved_q_loaded is None):
         return None
     
@@ -294,9 +300,8 @@ def compute_suggestion(signal_data, frequency, saved_q_loaded):
 
 
 # ** Plot + magnifier **
-
-def render_full_plot(signal_data, event_path):
-
+def render_plot(signal_data, event_path):
+    """Draw the original plot next to a magnifier preview that is used to show the specific part selected to be zoomed into."""
 
     fig = build_figure(signal_data, title=parse_event_path(event_path))
 
@@ -329,7 +334,7 @@ def render_full_plot(signal_data, event_path):
    
 
 def render_zoom_figure(fig, x_range, y_range, event_path):
-        
+    """Draw the zommed-in part next to the original plot."""
     zoom_fig = go.Figure(fig)
     zoom_fig.update_layout(
         xaxis=dict(range=x_range, title=None),
@@ -351,7 +356,7 @@ def render_zoom_figure(fig, x_range, y_range, event_path):
 
 # Printing the classification 
 def render_suggestion(suggestion):
-
+    """Show the classification suggestion (Real/False) if the required data is available."""
     if suggestion is  None: 
         st.info("Data is unavailable")  # if classificatin couldn't get computed
         return
@@ -369,7 +374,10 @@ def render_suggestion(suggestion):
     
 
 def render_labeling_options(current_status, event_path):
-
+    """
+    Show the note field, specialist checkbox and the labeling buttons.
+    Returns the clicked label or set as unlabled, the note and the status of the specialist checkbox.
+    """
 
     SRF_note = st.text_area(
         "Add a note (optional), If you decide to leave it blank, a generated note will be used.",
@@ -395,8 +403,9 @@ def render_labeling_options(current_status, event_path):
 
     return clicked_option, SRF_note, needs_specialist
 
-# if any option/button was clicked, update the label and the status of the event 
+
 def save_label(selected_path, event_path, clicked_option, SRF_note, needs_specialist):
+    """Save the label back to the h5 file using write_label function."""
     try:
         write_label(selected_path, event_path, clicked_option, SRF_note, needs_specialist)
         st.success(f"Saved: '{event_path}' marked as **{clicked_option.upper()}** and checked.") 
@@ -409,7 +418,6 @@ def save_label(selected_path, event_path, clicked_option, SRF_note, needs_specia
 def main():
     st.set_page_config(page_title="Quench Labeler", layout="wide")
     st.title("Plot a Waveform/Quench")
-
 
     # ** File Selection **
     selected_path = get_file_path()
@@ -435,7 +443,7 @@ def main():
     suggestion = compute_suggestion(signal_data, frequency, saved_q_loaded)
 
     # ** Plot + magnifier **
-    render_full_plot(signal_data, event_path)
+    render_plot(signal_data, event_path)
 
     # ** Labeling the waveform **
     st.subheader("Label this waveform")

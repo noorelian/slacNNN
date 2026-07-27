@@ -11,6 +11,28 @@ from utils.config import DATA_DIR
 """
 def load_all_quench_events() -> Iterator[Tuple[str, QuenchData]]:
     folder = Path(DATA_DIR)
+
+@dataclass
+class QuenchData:
+    fault_time: NDArray[np.float64]
+    fault_waveform: NDArray[np.float64]
+    forward_power: NDArray[np.float64]
+    forward_time: NDArray[np.float64]
+    reverse_power: NDArray[np.float64]
+    reverse_time: NDArray[np.float64]
+    decay_reference: Optional[NDArray[np.float64]] = None
+
+
+class QuenchStatus(Enum):
+    real = "real"
+    false = "false"
+    other = "other"
+    cavity_off = "cavity_off"
+
+
+# Traverses HDF5 files to extract and yield quench event datasets
+def load_quench_events(file_pattern: str = "*.h5") -> Iterator[Tuple[str, QuenchData]]:
+    folder = Path(DATA_DIR)
     # Use the argument instead of hardcoding the string here
     for h5_file in folder.glob(file_pattern):
         with h5py.File(h5_file, "r") as f:

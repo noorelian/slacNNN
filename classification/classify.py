@@ -3,31 +3,30 @@ from pathlib import Path
 from typing import Iterator, Tuple, Dict, Any
 
 from utils.config import DATA_DIR
-from .models import QuenchData
-from .data_loader import load_specific_quench_events
+from .data_loader import QuenchData, load_quench_events
 from .logic import classify
 
 
+# Runs the classification logic on events specifically for CM01 and CAV1
 def run_classification(
     events_iterator: Iterator[Tuple[str, QuenchData]],
 ) -> Dict[str, Any]:
     classification_results = {}
     for event_id, event_data in events_iterator:
-        label = classify(event_data)
-        classification_results[event_id] = label
+        if "CM01" in event_id and "CAV1" in event_id:
+            label = classify(event_data)
+            classification_results[event_id] = label
     return classification_results
 
 
-def analyze_classification(
-    predictions: Dict[str, Any], ground_truth_file: Path
+# Compares your predicted labels against the true labels and prints any mismatches
+def compare_classification(
+    predictions: Dict[str, Any], ground_truth_file: Path, cm_name: str, cav_name: str
 ) -> None:
     correct = 0
     total = 0
 
     with h5py.File(ground_truth_file, "r") as f:
-        cm_name = "CM01"
-        cav_name = "CAV1"
-
         if cm_name not in f or cav_name not in f[cm_name]:  # type: ignore
             return
 
@@ -68,12 +67,15 @@ def analyze_classification(
         print("\nWarning: No matching labeled events found.")
 
 
+# Loads data, runs classification, and checks the accuracy
 def main() -> None:
-    events_iterator = load_specific_quench_events()
+    target_files = "*.h5"
+
+    events_iterator = load_quench_events(target_files)
     prediction_results = run_classification(events_iterator)
 
     labeled_file_path = Path(DATA_DIR) / "quench_data_L0_noor.h5"
-    analyze_classification(prediction_results, labeled_file_path)
+    compare_classification(prediction_results, labeled_file_path, "CM01", "CAV1")
 
 
 if __name__ == "__main__":

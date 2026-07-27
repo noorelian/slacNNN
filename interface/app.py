@@ -1,5 +1,6 @@
 import os
 import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import h5py
 import numpy as np
 
@@ -9,16 +10,18 @@ import streamlit as st
 
 from h5_reader import (
     get_scalar,
-    suggest_classification,
+    #suggest_classification,
     write_label,
-    parse_event_path,
+    #parse_event_path,
     find_event_groups,
 )
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.quench_data_summary import list_cryomodules, list_cavities, list_years
 from plotting import build_figure, extract_box_range
 from quench_config import SIGNAL_TIME_MAP, LABEL_OPTIONS, LABEL_BUTTONS, LABEL_DISPLAY_TO_STORED, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS
+from utils.srf_waveforms import calculate_loaded_q, validate_quench_lisa
+from utils.srf_waveforms import convert_pv_name_plot_string
+
 
 
 def to_string(value):
@@ -45,7 +48,7 @@ def display_label(status, unlabeled="Unlabeled"):
 def checked_status(event_path, event_status):
     """Format an event's dropdown label: name | checked | label."""
     status = event_status[event_path]
-    event_name = parse_event_path(event_path)
+    event_name = convert_pv_name_plot_string(event_path)
     if status["checked"]:
         label = normalize_label(status["label"])
         label = label.upper() if label else "UNLABELED"
@@ -82,7 +85,7 @@ def format_event_status(event_path, status):
 
     flag = "Yes" if status["needs_specialist"] else "No"
 
-    display_name = parse_event_path(event_path).replace("|", "\\|")
+    display_name = convert_pv_name_plot_string(event_path).replace("|", "\\|")
 
     return build_summary_table(display_name, checked, label, note, flag, when)
 
@@ -294,7 +297,7 @@ def compute_suggestion(signal_data, frequency, saved_q_loaded):
     x_fault, y_fault = signal_data["fault_waveform"]    # get the fault waveform time and amplitude 
 
     try:
-        return suggest_classification(x_fault, y_fault, frequency, saved_q_loaded)
+        return calculate_loaded_q(x_fault, y_fault, frequency, saved_q_loaded)
     except Exception as e:
         return {"is_real": None, "loaded_q": np.nan, "other_issue": f"error: {e}"}
 
@@ -303,7 +306,7 @@ def compute_suggestion(signal_data, frequency, saved_q_loaded):
 def render_plot(signal_data, event_path):
     """Draw the original plot next to a magnifier preview that is used to show the specific part selected to be zoomed into."""
 
-    fig = build_figure(signal_data, title=parse_event_path(event_path))
+    fig = build_figure(signal_data, title=convert_pv_name_plot_string(event_path))
 
     st.caption("Drag a box on the plot to preview a zoomed-in view on the right side of the screen")
 

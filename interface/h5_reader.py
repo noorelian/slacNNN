@@ -15,6 +15,7 @@ from quench_config import (
 from utils.quench_data_summary import list_cavities, has_signal
 
 
+
 def get_scalar(group, keys):
     """
     This function is used for extracting a single scalar value (frequency, saved Q) 
@@ -43,8 +44,9 @@ def get_scalar(group, keys):
     return None
 
 
+"""
 def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
-    """
+    
     This function is responsible for suggesting whether an event is real or false, this is how it works:
     - Trim the waveform to start at t = 0
     - Trim the tail once the amplitude is < 0.002
@@ -53,7 +55,7 @@ def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
    
     https://education.molssi.org/python-data-analysis/03-data-fitting/index.html
 
-    """
+    
     other = None
 
     time_data = np.asarray(time_data, dtype=float)
@@ -94,6 +96,7 @@ def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
     is_real = bool(loaded_q < thresh_for_quench)
     return {"is_real": is_real, "loaded_q": loaded_q, "other_issue": other}
 
+"""
 
 def find_event_groups(hdf5_file, cm=None, cav=None, year=None):
     """This function is for finding each event groups/identifiers (decay ref, forward power, fault waveform) for each cm/cav/date, used for plotting """
@@ -144,9 +147,9 @@ def write_label(file_path, event_path, label, srf_note, needs_specialist):
         group.attrs[NEEDS_SPECIALIST] = bool(needs_specialist)
 
 
-
+"""
 def parse_event_path(event_path):
-    """Turn 'CM/CAV/YYYYMMDD_HHMMSS' into a human readable label"""
+    #Turn 'CM/CAV/YYYYMMDD_HHMMSS' into a human readable label
     match = re.search(r"CM(\d+)/CAV(\d+)/(\d{8})_(\d{6})", event_path)
     if match:
         cm, cav, date_str, time_str = match.groups()
@@ -156,3 +159,4 @@ def parse_event_path(event_path):
     else:
         print(f"Warning: Could not parse event path: {event_path}")
         return event_path
+"""

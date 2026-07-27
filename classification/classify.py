@@ -7,18 +7,19 @@ from .data_loader import QuenchData, load_quench_events
 from .logic import classify
 
 
+# Runs the classification logic on events specifically for CM01 and CAV1
 def run_classification(
     events_iterator: Iterator[Tuple[str, QuenchData]],
 ) -> Dict[str, Any]:
     classification_results = {}
     for event_id, event_data in events_iterator:
-        # Removed the "L0" check since file_prefix is no longer in the event_id
         if "CM01" in event_id and "CAV1" in event_id:
             label = classify(event_data)
             classification_results[event_id] = label
     return classification_results
 
 
+# Compares your predicted labels against the true labels and prints any mismatches
 def compare_classification(
     predictions: Dict[str, Any], ground_truth_file: Path, cm_name: str, cav_name: str
 ) -> None:
@@ -66,8 +67,11 @@ def compare_classification(
         print("\nWarning: No matching labeled events found.")
 
 
+# Loads data, runs classification, and checks the accuracy
 def main() -> None:
-    events_iterator = load_quench_events()
+    target_files = "*.h5"
+
+    events_iterator = load_quench_events(target_files)
     prediction_results = run_classification(events_iterator)
 
     labeled_file_path = Path(DATA_DIR) / "quench_data_L0_noor.h5"

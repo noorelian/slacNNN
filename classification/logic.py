@@ -2,10 +2,12 @@ import numpy as np
 from .data_loader import QuenchData, QuenchStatus
 
 
+# Locates the array index corresponding to the onset of the quench event at time zero
 def find_quench_time(quench_event_data: QuenchData) -> int:
     return int(np.searchsorted(quench_event_data.fault_time, 0.0))
 
 
+# Evaluates the pre-quench waveform and forward power to confirm the cavity is on
 def pre_quench_amplitude(quench_event_data: QuenchData, time_0: int) -> bool:
     pre_quench_window = quench_event_data.fault_waveform[0:time_0]
     is_avg_sufficient = np.mean(pre_quench_window) >= 0.1
@@ -16,6 +18,7 @@ def pre_quench_amplitude(quench_event_data: QuenchData, time_0: int) -> bool:
     return bool(is_avg_sufficient and is_fwd_power_on)
 
 
+# Compares the mean waveform amplitude before and after the fault to identify odd behavior
 def is_post_quench_higher(quench_event_data: QuenchData, time_0: int) -> bool:
     pre_quench_mean = np.mean(quench_event_data.fault_waveform[:time_0])
     post_quench_mean = np.mean(quench_event_data.fault_waveform[time_0:])
@@ -23,6 +26,7 @@ def is_post_quench_higher(quench_event_data: QuenchData, time_0: int) -> bool:
     return bool(post_quench_mean > pre_quench_mean)
 
 
+# Calculates the post-fault decay time constant and compares it against expected theoretical metrics
 def verify_tau_decay(quench_event_data: QuenchData, time_0: int) -> bool:
     decay_waveform = quench_event_data.fault_waveform[time_0:]
     decay_time = quench_event_data.fault_time[time_0:]
@@ -46,6 +50,7 @@ def verify_tau_decay(quench_event_data: QuenchData, time_0: int) -> bool:
     return bool(t1 < threshold)
 
 
+# Determines the operational status of the quench event
 def classify(event_data: QuenchData) -> QuenchStatus:
     time_0 = find_quench_time(event_data)
 

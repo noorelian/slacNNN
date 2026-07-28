@@ -23,7 +23,7 @@ def add_multipacting_flags(file_path, multipacting_file, flag_attr='Multipacting
         )
         multipacting_keys.add(key)
 
-    matched = 0     # flagged events 
+    matched = 0     # flagged multipacting events 
     total = 0       # valid processed events 
 
     # read the h5 file 
@@ -35,29 +35,30 @@ def add_multipacting_flags(file_path, multipacting_file, flag_attr='Multipacting
         for path in event_paths:
             parts = path.split('/')     # split like this ['CM01', 'CAV1', '20240116_103022']
 
-            # A real event has exactly 3 parts: CM / CAV / timestamp
-            # Skip anything else (like top-level CM or CAV groups)
+            # A valid event has exactly 3 parts: CM / CAV / timestamp
+            # Skip anything else (like top level CM or CAV groups)
             if len(parts) != 3:
                 continue
 
-            cm, cav, timestamp = parts
+            cm, cav, timestamp = parts  # Split the 3 parts into cryomodule, cavity and timestamp variables
 
             if '_' not in timestamp or len(timestamp.split('_')[0]) != 8:
                 continue
+                # if the event is missing any of those parts, then skip it 
 
-            date_part = timestamp.split('_')[0]
-            year = date_part[0:4]
-            month = date_part[4:6]
-            day = date_part[6:8]
+            date_part = timestamp.split('_')[0]     # Extract the date without the (HHMMSS)
+            year = date_part[0:4]                   # First 4 charcters are the year
+            month = date_part[4:6]                  # The next 2 are the month 
+            day = date_part[6:8]                    # The last 2 are the day 
 
             event_key = (cm.strip(), cav.strip(), year, month, day)
             total += 1
 
-            is_multipacting = event_key in multipacting_keys
-            f[path].attrs[flag_attr] = bool(is_multipacting)
+            is_multipacting = event_key in multipacting_keys        # Check if the event is in the multipcating set 
+            f[path].attrs[flag_attr] = bool(is_multipacting)        # Write the boolean result back to the h5 file
 
             if is_multipacting:
-                matched += 1
+                matched += 1        # Increment the multipacting events counter 
 
 def load_csv(path):
     """
@@ -79,8 +80,9 @@ def load_csv(path):
 
 
 if __name__ == '__main__':
-    h5_file_path = '/Users/nelian/slacNNN/data/quench_data_L3.h5' # Your h5 file path
-    csv_file = '/Users/nelian/slacNNN/config/all_mp_dates.csv' # The mp file 
+    # Change those two fields:
+    h5_file_path = '/Users/yourname/data/quench_data_L1.h5' # Your h5 file path
+    csv_file = '/Users/yourname/config/all_mp_dates.csv' # The mp file 
 
     add_multipacting_flags(file_path=h5_file_path, multipacting_file=csv_file)
 

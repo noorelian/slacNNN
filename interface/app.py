@@ -25,9 +25,6 @@ from classification.logic import classify, QuenchStatus, QuenchData
 
 
 
-
-
-
 def to_string(value):
     """ Decode byte attributes to string."""
     return value.decode() if isinstance(value, bytes) else value 

@@ -12,23 +12,30 @@ from quench_config import (
     NEEDS_SPECIALIST,
     LOADED_Q_CHANGE_FOR_QUENCH,
 )
+from utils.quench_data_summary import list_cavities, has_signal
+
 
 
 def get_scalar(group, keys):
     """
-    This function is used for extracting a scalar value from the h5 file 
-
+    This function is used for extracting a single scalar value (frequency, saved Q) 
+    from the h5 file to compute the REAL/ FALSE classification suggestion
     """
+    
     for key in keys:
+        # Case1: the key is a dataset and it is stored inside the group 
         if key in group:
             try:
-                arr = np.asarray(group[key])
+                # If it's an array, take the first element using flat[0]
+                arr = np.asarray(group[key]) 
                 return float(arr.flat[0]) if arr.shape else float(arr)
             except Exception:
                 continue
+        # Case2: the key is stored as an attribute 
         if key in group.attrs:
             try:
                 val = group.attrs[key]
+                # decode to a string first if the attribute is stored as bytes 
                 if isinstance(val, bytes):
                     val = val.decode()
                 return float(val)
@@ -37,8 +44,9 @@ def get_scalar(group, keys):
     return None
 
 
+"""
 def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
-    """
+    
     This function is responsible for suggesting whether an event is real or false, this is how it works:
     - Trim the waveform to start at t = 0
     - Trim the tail once the amplitude is < 0.002
@@ -47,7 +55,7 @@ def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
    
     https://education.molssi.org/python-data-analysis/03-data-fitting/index.html
 
-    """
+    
     other = None
 
     time_data = np.asarray(time_data, dtype=float)
@@ -88,31 +96,7 @@ def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
     is_real = bool(loaded_q < thresh_for_quench)
     return {"is_real": is_real, "loaded_q": loaded_q, "other_issue": other}
 
-def list_cryomodules(h5_file):
-    "This function is used for the events filter"
-    return sorted(k for k in h5_file.keys() if re.fullmatch(r"CM\d+", k))
-
-
-def list_cavities(h5_file, cm):
-    "This function is used for the events filter"
-    if cm not in h5_file:
-        return []
-    return sorted(k for k in h5_file[cm].keys() if re.fullmatch(r"CAV\d+", k))
-
-def list_years(h5_file, cm, cav):
-    "This function is used for the events filter"
-    years = set()
-    if cm in h5_file and cav in h5_file[cm]:
-        for name in h5_file[cm][cav].keys():
-            match = re.match (r"(\d{4})\d{4}_\d{6}", name)
-            if match:
-                years.add(match.group(1))
-    return sorted(years)
-
-def has_signal(group):
-    return bool(set(group.keys()) & set(SIGNAL_TIME_MAP.keys()))
-
-
+"""
 
 def find_event_groups(hdf5_file, cm=None, cav=None, year=None):
     """This function is for finding each event groups/identifiers (decay ref, forward power, fault waveform) for each cm/cav/date, used for plotting """
@@ -163,8 +147,9 @@ def write_label(file_path, event_path, label, srf_note, needs_specialist):
         group.attrs[NEEDS_SPECIALIST] = bool(needs_specialist)
 
 
+"""
 def parse_event_path(event_path):
-    """Turn 'CM/CAV/YYYYMMDD_HHMMSS' into a human readable label"""
+    #Turn 'CM/CAV/YYYYMMDD_HHMMSS' into a human readable label
     match = re.search(r"CM(\d+)/CAV(\d+)/(\d{8})_(\d{6})", event_path)
     if match:
         cm, cav, date_str, time_str = match.groups()
@@ -174,3 +159,4 @@ def parse_event_path(event_path):
     else:
         print(f"Warning: Could not parse event path: {event_path}")
         return event_path
+"""

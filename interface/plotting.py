@@ -47,8 +47,7 @@ def plot_style(signal_name, x, y):
                legendgroup=signal_name,
                showlegend=False,
                opacity=opacity,
-               marker=dict(symbol=marker_symbol, size=markersize, color=color,
-                           line=dict(width=1, color=color)),
+               marker=dict(symbol=marker_symbol, size=markersize, color=color, line=dict(width=1, color=color)),
                yaxis=yaxis,
            )
        )
@@ -60,8 +59,7 @@ def plot_style(signal_name, x, y):
                legendgroup=signal_name,
                showlegend=True,
                line=dict(color=color, dash=dash, width=width),
-               marker=dict(symbol=marker_symbol, size=markersize, color=color,
-                           line=dict(width=1, color=color)),
+               marker=dict(symbol=marker_symbol, size=markersize, color=color, line=dict(width=1, color=color)),
                yaxis=yaxis
            )
        )
@@ -107,7 +105,7 @@ def build_figure(signal_data, title):
     fig.update_layout(
        title=title,
        xaxis=dict(
-           title="Time (s)",
+            title="Time (s)",
            anchor="y",
            range=[-0.1, 0.1],
            fixedrange=False,
@@ -129,7 +127,7 @@ def build_figure(signal_data, title):
        ),
       
        template="plotly_white",
-       width=700,
+       width=900,
        height=700,
        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
        dragmode="select",

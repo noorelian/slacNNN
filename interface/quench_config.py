@@ -12,6 +12,8 @@ SIGNAL_TIME_MAP = {
     "fault_waveform": "fault_time",
     "decay_reference": "forward_time",  
 }
+
+LABEL_OPTIONS = ["All", "REAL", "FALSE", "OTHER", "Unlabeled", "NOT SURE", "CAVITY OFF"]
 # Styles for the plot
 STYLES = {
    'fault_waveform':  {'color': 'indigo', 'linestyle': '-',  'linewidth': 3, 'alpha': 1.0,
@@ -32,6 +34,14 @@ STYLES = {
 LINE_STYLES = {"-": "solid", "--": "dash", ":": "dot", "-.": "dashdot"}
 MARKERS = {"o": "circle", "x": "x", "s": "square", "^": "triangle-up", "d": "diamond"}
 
+LABEL_BUTTONS = [
+    ("REAL", "real"),
+    ("FALSE", "false"),
+    ("OTHER", "other"),
+    ("NOT SURE", "not_sure"),
+    ("Cavity Off", "cavity_off"),
+]
+
 LABEL_DISPLAY_TO_STORED = {
     "REAL": "real",
     "FALSE": "false",
@@ -47,6 +57,7 @@ CHECKED = "checked" # checked or unchecked(True or false)
 NOTE = "note"  # note BY CHECKER 
 CHECKED_AT = "checked_at" # TIME WHEN CHECKED
 NEEDS_SPECIALIST = "needs_specialist" # someone should go and chcek the cavity 
+QUENCH_CLASSIFICATION = "quench_classification_suggestion"
 
 # used for classification suggestion
 FREQUENCY_KEYS = ["frequency", "FREQ"] #used for searching for the cavity frequency 

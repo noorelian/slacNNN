@@ -1,50 +1,72 @@
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import h5py
 import numpy as np
+
 import streamlit as st
 import plotly.graph_objects as go
-
-from quench_config import SIGNAL_TIME_MAP, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS, LABEL_DISPLAY_TO_STORED
+import streamlit as st
 
 from h5_reader import (
     get_scalar,
-    suggest_classification,
-    find_event_groups,
+    #suggest_classification,
     write_label,
-    parse_event_path,
-    list_cryomodules,
-    list_cavities,
-    list_years,
+    #parse_event_path,
+    find_event_groups,
 )
 
+from utils.quench_data_summary import list_cryomodules, list_cavities, list_years
 from plotting import build_figure, extract_box_range
+from quench_config import SIGNAL_TIME_MAP, LABEL_OPTIONS, LABEL_BUTTONS, LABEL_DISPLAY_TO_STORED, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS
+from utils.srf_waveforms import calculate_loaded_q, validate_quench_lisa
+from utils.srf_waveforms import convert_pv_name_plot_string
 
 
-st.set_page_config(page_title="Quench Labeler", layout="wide")
-st.title("Plot a Waveform/Quench")
+
+def to_string(value):
+    """ Decode byte attributes to string."""
+    return value.decode() if isinstance(value, bytes) else value 
+
 
 def normalize_label(label):
     """Normalize any label to a canonical form so case, spaces, and
     underscores never matter. 'NOT SURE', 'not_sure', 'Not Sure' all match."""
-    if label is None:
-        return ""
-    if isinstance(label, bytes):
-        label = label.decode()
-    label = str(label).strip().lower()         
-    label = label.replace(" ", "_")             
-    return label
+    label = to_string(label)
+
+    if not label:
+        return ""          
+    return str(label).strip().lower().replace(" ", "_")
+
+def display_label(status, unlabeled="Unlabeled"):
+    """Uppercased, human readable label, or unlabeled if nothing is set."""
+    label =normalize_label(status["label"])
+    return label.upper() if label else unlabeled 
+
 
 # A helper function that is responsible for the status of the file in the dropdown
 def checked_status(event_path, event_status):
     """Format an event's dropdown label: name | checked | label."""
     status = event_status[event_path]
-    event_name = parse_event_path(event_path)
+    event_name = convert_pv_name_plot_string(event_path)
     if status["checked"]:
         label = normalize_label(status["label"])
         label = label.upper() if label else "UNLABELED"
         return f"{event_name}   |   Checked: Yes    |   Label: {label}"
     return f"{event_name}   |   Checked: No |   Label: unlabeled"
 
+
+def build_summary_table(display_name, checked, label, note, flag, when):
+    """Build a markdown table for each event."""
+    return f"""
+    | **Event name**                        | {display_name}                      |
+    |---------------------------------------|-------------------------------------|
+    | **Checked**                           | {checked}                           |
+    | **Label**                             | {label}                             |
+    | **Note**                              | {note}                              |
+    | **Need a specialist to inspect the cavity** | {flag}                        |
+    | **Last updated**                      | {when}                              |
+    """
 
 # A function to format the event status(checked or unchecked), label(Real or False or Other) and note
 def format_event_status(event_path, status):
@@ -63,17 +85,9 @@ def format_event_status(event_path, status):
 
     flag = "Yes" if status["needs_specialist"] else "No"
 
-    display_name = parse_event_path(event_path).replace("|", "\\|")
+    display_name = convert_pv_name_plot_string(event_path).replace("|", "\\|")
 
-    return f"""
-    | **Event name**                        | {display_name}                      |
-    |---------------------------------------|-------------------------------------|
-    | **Checked**                           | {checked}                           |
-    | **Label**                             | {label}                             |
-    | **Note**                              | {note}                              |
-    | **Need a specialist to inspect the cavity** | {flag}                        |
-    | **Last updated**                      | {when}                              |
-    """
+    return build_summary_table(display_name, checked, label, note, flag, when)
 
 @st.cache_data(show_spinner=False)
 def cached_cryomodules(path, mtime):
@@ -110,69 +124,80 @@ def cached_events(path, mtime, cm, cav, year):
     return events, event_status
 
 # ** File Selection **
-selected_path = st.text_input("Enter the full HDF5 File Path", value="")    # Getting the HDF5 file path from the user 
+def get_file_path():
+    """Ask for the h5 file path and validate it."""
+    selected_path = st.text_input("Enter the full HDF5 File Path", value="")    # Getting the HDF5 file path from the user 
 
-# if nothing was entered, it will reask you to enter a path 
-if not selected_path:
-    st.info("Enter the full path to a HDF5 file above.")
-    st.stop()
+    # if nothing was entered, it will reask you to enter a path 
+    if not selected_path:
+        st.info("Enter the full path to a HDF5 file above.")
+        st.stop()
 
-# if entered something else otherthan a file path, it will give you an error message 
-if not os.path.isfile(selected_path):
-    st.error(f"File not found: {selected_path}")
-    st.stop()
+    # if entered something else otherthan a file path, it will give you an error message 
+    if not os.path.isfile(selected_path):
+        st.error(f"File not found: {selected_path}")
+        st.stop()
+    return selected_path
 
-file_mtime = os.path.getmtime(selected_path)
 
-try:
-    cm_options = ["All"] + cached_cryomodules(selected_path, file_mtime)
-except Exception as e:
-    st.error(f"Could not open the file: {e}")
-    st.stop()
+def render_filters(selected_path, file_mtime):
+    """Render the CM/CAV/year/label filters."""
+    try:
+        cm_options = ["All"] + cached_cryomodules(selected_path, file_mtime)
+    except Exception as e:
+        st.error(f"Could not open the file: {e}")
+        st.stop()
 
-filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
+    filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
 
-with filter_col1:
-    selected_cm = st.selectbox("Cryomodule", cm_options, key="filter_cm")
+    with filter_col1:
+        selected_cm = st.selectbox("Cryomodule", cm_options, key="filter_cm")
 
-cav_options =["All"]
+    cav_options =["All"]
 
-if selected_cm != "All":
-    cav_options += cached_cavities(selected_path, file_mtime, selected_cm)
+    if selected_cm != "All":
+        cav_options += cached_cavities(selected_path, file_mtime, selected_cm)
 
-with filter_col2:
-    selected_cav = st.selectbox("Cavity", cav_options, key="filter_cav", disabled=(selected_cm == "All"))
+    with filter_col2:
+        selected_cav = st.selectbox("Cavity", cav_options, key="filter_cav", disabled=(selected_cm == "All"))
 
-year_options = ["All"]
-if selected_cm != "All" and selected_cav != "All":
-    year_options += cached_years(selected_path, file_mtime, selected_cm, selected_cav)
+    year_options = ["All"]
+    if selected_cm != "All" and selected_cav != "All":
+        year_options += cached_years(selected_path, file_mtime, selected_cm, selected_cav)
 
-with filter_col3:
-    selected_year = st.selectbox("Year", year_options, key="filter_year", disabled=(selected_cm == "All" or selected_cav == "All"))
+    with filter_col3:
+        selected_year = st.selectbox("Year", year_options, key="filter_year", disabled=(selected_cm == "All" or selected_cav == "All"))
 
-with filter_col4:
-    label_options = ["All", "REAL", "FALSE", "OTHER", "Unlabeled", "NOT SURE", "CAVITY OFF"]
-    selected_option = st.selectbox("Label", label_options, key="filter_label")
+    with filter_col4:
+        selected_option = st.selectbox("Label", LABEL_OPTIONS, key="filter_label")
 
-cm_filter = selected_cm if selected_cm != "All" else None
-cav_filter = selected_cav if selected_cav != "All" else None
-year_filter = selected_year if selected_year != "All" else None
+    cm_filter = selected_cm if selected_cm != "All" else None
+    cav_filter = selected_cav if selected_cav != "All" else None
+    year_filter = selected_year if selected_year != "All" else None
 
-if cm_filter is None:
-    st.caption("Narrow down by cryomodule, cavity, year and label for a faster and more focused set of events")
+    if cm_filter is None:
+        st.caption("Narrow down by cryomodule, cavity, year and label for a faster and more focused set of events")
+    
+    return cm_filter, cav_filter, year_filter, selected_option
 
-try:
-    events, event_status = cached_events(selected_path, file_mtime, cm_filter, cav_filter, year_filter)
 
-except Exception as e:
-    st.error(f"Could not read events from the h5 file: {e}")
-    st.stop()
+def get_events(selected_path, file_mtime, cm_filter, cav_filter, year_filter):
+    """Load events for the chosen filters."""
+    try:
+        events, event_status = cached_events(selected_path, file_mtime, cm_filter, cav_filter, year_filter)
 
-if not events:
-    st.warning("No recognizable quench events found")
-    st.stop()
+    except Exception as e:
+        st.error(f"Could not read events from the h5 file: {e}")
+        st.stop()
 
-def event_matches_label(event_path, target_label):
+    if not events:
+        st.warning("No recognizable quench events found")
+        st.stop()
+
+    return events, event_status
+
+
+def event_matches_label(event_path, event_status, target_label):
     """This function is used for the label filter"""
     if target_label == "All":
         return True
@@ -188,41 +213,48 @@ def event_matches_label(event_path, target_label):
     
     return label == target
 
-if selected_option != "All":
-    events = [e for e in events if event_matches_label(e, selected_option)]
+def filter_events_by_label(events, event_status, label):
+    """This function is used to filter events by label"""
+    if label == "All":
+        return events
+    
+    filtered =[e for e in events if event_matches_label(e, event_status, label)]
 
-    if not events:
+    if not filtered:
         st.warning("No events found with this label")
         st.stop()
-
+    return filtered 
 
 # ** Event selection **
+def select_waveform_event(events, event_status, filter_key):
+    """Select events from the dropdown."""
+    if ("selected_event" in st.session_state and st.session_state["selected_event"] in events):
+        default_index = events.index(st.session_state["selected_event"])
+    else:
+        default_index = 0
 
-if "selected_event" in st.session_state and st.session_state["selected_event"] in events:
-    default_index = events.index(st.session_state["selected_event"])
-else:
-    default_index = 0
+    event_path = st.selectbox(
+        f"Select event ({len(events)} found)",
+        events,
+        index=default_index,
+        format_func=lambda p: checked_status(p, event_status),
+        key=f"event_selectbox_{filter_key}",
+    )
+    st.session_state["selected_event"] = event_path
+    return event_path
 
-event_path = st.selectbox(
-    f"Select event ({len(events)} found)",
-    events,
-    index=default_index,
-    format_func=lambda p: checked_status(p, event_status),
-    key=f"event_selectbox_{cm_filter}_{cav_filter}_{year_filter}_{selected_option}",
-)
-st.session_state["selected_event"] = event_path
+def show_event_status(event_path, current_status):
+    """Show the status tabel and a specilist warning if needed."""
 
-current_status = event_status[event_path]
+    st.markdown(format_event_status(event_path, current_status), unsafe_allow_html=True)
 
-st.markdown(format_event_status(event_path, current_status), unsafe_allow_html=True)
-
-if current_status["needs_specialist"]:
-    st.warning("A specialist needs to inspect the cavity")
+    if current_status["needs_specialist"]:
+        st.warning("A specialist needs to inspect the cavity")
 
 
 # ** Load waveform data for the selected event **
-with h5py.File(selected_path, "r") as f:
-    group = f[event_path]
+def load_signal_data(group):
+    """Load signals data (decay_ref, fault_waveform, forward_power, reverse_power)."""
     signal_data = {}
 
     for signal_name, time in SIGNAL_TIME_MAP.items():
@@ -243,134 +275,190 @@ with h5py.File(selected_path, "r") as f:
 
         signal_data[signal_name] = (x, y)   # store the loaded signal data 
 
-    frequency = get_scalar(group, FREQUENCY_KEYS)   #read cavity frequency 
-    saved_q_loaded = get_scalar(group, SAVED_Q_LOADED_KEYS) #read the saved loaded Q
+    return signal_data
 
 
 # ** Classification suggestion **
+def load_event_data_for_classification(path, event_path):
+    """load frequency and saved_Q for computing the classsification suggestion"""
+    with h5py.File(path, "r") as f:
+        group = f[event_path]
+        signal_data = load_signal_data(group)
+        frequency = get_scalar(group, FREQUENCY_KEYS)   #read cavity frequency 
+        saved_q_loaded = get_scalar(group, SAVED_Q_LOADED_KEYS) #read the saved loaded Q
+    return signal_data, frequency, saved_q_loaded
 
-suggestion = None
-if "fault_waveform" in signal_data and frequency is not None and saved_q_loaded is not None:
+
+def compute_suggestion(signal_data, frequency, saved_q_loaded):
+    """Compute the classification suggestion"""
+    if ("fault_waveform" not in signal_data or frequency is None or saved_q_loaded is None):
+        return None
+    
     x_fault, y_fault = signal_data["fault_waveform"]    # get the fault waveform time and amplitude 
+
     try:
-        suggestion = suggest_classification(x_fault, y_fault, frequency, saved_q_loaded)
+        return calculate_loaded_q(x_fault, y_fault, frequency, saved_q_loaded)
     except Exception as e:
-        suggestion = {"is_real": None, "loaded_q": np.nan, "other_issue": f"error: {e}"}
+        return {"is_real": None, "loaded_q": np.nan, "other_issue": f"error: {e}"}
 
 
 # ** Plot + magnifier **
+def render_plot(signal_data, event_path):
+    """Draw the original plot next to a magnifier preview that is used to show the specific part selected to be zoomed into."""
 
-fig = build_figure(signal_data, title=parse_event_path(event_path))
+    fig = build_figure(signal_data, title=convert_pv_name_plot_string(event_path))
 
-st.caption("Drag a box on the plot to preview a zoomed-in view on the right side of the screen")
+    st.caption("Drag a box on the plot to preview a zoomed-in view on the right side of the screen")
 
-col_main, col_zoom = st.columns([2, 1])
+    col_main, col_zoom = st.columns([2, 1])
 
-with col_main:
-    select_event = st.plotly_chart(
-        fig,
+    with col_main:
+        select_event = st.plotly_chart(
+            fig,
+            use_container_width=False,
+            on_select="rerun",
+            selection_mode=("box",),
+            key=f"main_chart_{event_path}",
+        )
+
+    with col_zoom:
+        st.caption("🔍 Magnifier preview")
+
+        box_list = select_event.selection.get("box", []) if select_event else []
+        x_range, y_range = (None, None)
+        if box_list:
+            x_range, y_range = extract_box_range(box_list[0])
+
+        if x_range and y_range:
+            render_zoom_figure(fig, x_range, y_range, event_path)
+        else:
+            st.info("No selection yet. Drag a box on the plot to preview it here")
+
+   
+
+def render_zoom_figure(fig, x_range, y_range, event_path):
+    """Draw the zommed-in part next to the original plot."""
+    zoom_fig = go.Figure(fig)
+    zoom_fig.update_layout(
+        xaxis=dict(range=x_range, title=None),
+        yaxis=dict(range=y_range, title=None),
+        margin=dict(l=10, r=10, t=10, b=10),
+        width=260,
+        height=300,
+        showlegend=False,
+        title=None,
+        dragmode=False,
+        )
+    st.plotly_chart(
+        zoom_fig,
         use_container_width=False,
-        on_select="rerun",
-        selection_mode=("box",),
-        key=f"main_chart_{event_path}",
+        config={"staticPlot": True},
+        key=f"zoom_chart_{event_path}",
     )
 
-with col_zoom:
-    st.caption("🔍 Magnifier preview")
-
-    box_list = select_event.selection.get("box", []) if select_event else []
-    x_range, y_range = (None, None)
-    if box_list:
-        x_range, y_range = extract_box_range(box_list[0])
-
-    if x_range and y_range:
-        zoom_fig = go.Figure(fig)
-        zoom_fig.update_layout(
-            xaxis=dict(range=x_range, title=None),
-            yaxis=dict(range=y_range, title=None),
-            margin=dict(l=10, r=10, t=10, b=10),
-            width=260,
-            height=300,
-            showlegend=False,
-            title=None,
-            dragmode=False,
-        )
-        st.plotly_chart(
-            zoom_fig,
-            use_container_width=False,
-            config={"staticPlot": True},
-            key=f"zoom_chart_{event_path}",
-        )
-    else:
-        st.info("No selection yet. Drag a box on the plot to preview it here")
-
-
-# ** Labeling the waveform **
-
-st.subheader("Label this waveform")
 
 # Printing the classification 
-if suggestion is not None:  # if the classification was computed
+def render_suggestion(suggestion):
+    """Show the classification suggestion (Real/False) if the required data is available."""
+    if suggestion is  None: 
+        st.info("Data is unavailable")  # if classificatin couldn't get computed
+        return
+
     if suggestion["other_issue"] is not None and suggestion["is_real"] is None: #if failed, display a warning message 
-        st.error(f"Could not provide a suggested classification ({suggestion['other_issue']})")
-    else:
-        suggested_label = "REAL" if suggestion["is_real"] else "FALSE"
-        q_text = f"{suggestion['loaded_q']:.3e}" if np.isfinite(suggestion["loaded_q"]) else "N/A"
-        st.info(
-            f"The system suggests that the given waveform is **{suggested_label}** "
-            f"and the estimated loaded Q = {q_text}"
-        )
-else:
-    st.info("Data is unavailable")  # if classificatin couldn't get computed
+            st.error(f"Could not provide a suggested classification ({suggestion['other_issue']})")
+            return 
+    
+    suggested_label = "REAL" if suggestion["is_real"] else "FALSE"
+    q_text = f"{suggestion['loaded_q']:.3e}" if np.isfinite(suggestion["loaded_q"]) else "N/A"
+    st.info(
+        f"The system suggests that the given waveform is **{suggested_label}** "
+        f"and the estimated loaded Q = {q_text}"
+    )
+    
 
-SRF_note = st.text_area(
-    "Add a note (optional), If you decide to leave it blank, a generated note will be used.",
-    value="",
-    key=f"note_{event_path}",
-)
+def render_labeling_options(current_status, event_path):
+    """
+    Show the note field, specialist checkbox and the labeling buttons.
+    Returns the clicked label or set as unlabled, the note and the status of the specialist checkbox.
+    """
 
-# A checkbox if there is a need for a specialist to check the cvaity in person 
-needs_specialist = st.checkbox(
-    "Needs specialist to inpect the cavity in person",
-    value=current_status["needs_specialist"],
-    key=f"specilist_{event_path}",
-)
+    SRF_note = st.text_area(
+        "Add a note (optional), If you decide to leave it blank, a generated note will be used.",
+        value="",
+        key=f"note_{event_path}",
+    )
 
-# 3 colums fo the 3 options (real, false , other)
-col1, col2, col3, col4, col5 = st.columns(5)
+    # A checkbox if there is a need for a specialist to check the cvaity in person 
+    needs_specialist = st.checkbox(
+        "Needs specialist to inpect the cavity in person",
+        value=current_status["needs_specialist"],
+        key=f"specilist_{event_path}",
+    )
 
-clicked_option = None
+    clicked_option = None
+    # 3 colums fo the 3 options (real, false , other)
+    columns = st.columns(len(LABEL_BUTTONS))
 
-with col1:
-    # set clicked_option = real if "REAL" was chosen
-    if st.button("REAL", use_container_width=True):
-        clicked_option = "real"
+    for col, (display_text, stored_value) in zip (columns, LABEL_BUTTONS):
+        with col:
+            if st.button(display_text, use_container_width=True):
+                clicked_option = stored_value
 
-with col2:
-    # set clicked_option = false if "FALSE" was chosen 
-    if st.button("FALSE", use_container_width=True):
-        clicked_option = "false"
+    return clicked_option, SRF_note, needs_specialist
 
-with col3:
-    # set the clicked_option = other if "OTHER" was chosen 
-    if st.button("OTHER", use_container_width=True):
-        clicked_option = "other"
 
-with col4:
-    #set clicked_option = not_sure if "NOT SURE" was chosen
-    if st.button("NOT SURE", use_container_width=True):
-       clicked_option = "not_sure"
-
-with col5:
-    if st.button("Cavity Off", use_container_width=True):
-       clicked_option = "cavity_off"
-
-# if any option/button was clicked, update the label and the status of the event 
-if clicked_option:
+def save_label(selected_path, event_path, clicked_option, SRF_note, needs_specialist):
+    """Save the label back to the h5 file using write_label function."""
     try:
         write_label(selected_path, event_path, clicked_option, SRF_note, needs_specialist)
         st.success(f"Saved: '{event_path}' marked as **{clicked_option.upper()}** and checked.") 
-        cached_events.clear()
+        cached_events.clear() # clear cache so the new label shows up
         st.rerun()
     except Exception as e:
         st.error(f"Could not write label to file: {e}")
+
+
+def main():
+    st.set_page_config(page_title="Quench Labeler", layout="wide")
+    st.title("Plot a Waveform/Quench")
+
+    # ** File Selection **
+    selected_path = get_file_path()
+    file_mtime = os.path.getmtime(selected_path)
+
+    # ** Filters **
+    cm_filter, cav_filter, year_filter, label_option = render_filters(selected_path, file_mtime)
+
+    # ** Load events for the chosen filters **
+    events, event_status = get_events(selected_path, file_mtime, cm_filter, cav_filter, year_filter)
+
+    # ** Apply the label filter **
+    events = filter_events_by_label(events, event_status, label_option)
+
+    # ** Event selection + status display **
+    filter_key = f"{cm_filter}_{cav_filter}_{year_filter}_{label_option}"
+    event_path = select_waveform_event(events, event_status, filter_key)
+    current_status = event_status[event_path]
+    show_event_status(event_path, current_status)
+
+    # ** Compute Classification Suggestion **
+    signal_data, frequency, saved_q_loaded, = load_event_data_for_classification(selected_path, event_path)
+    suggestion = compute_suggestion(signal_data, frequency, saved_q_loaded)
+
+    # ** Plot + magnifier **
+    render_plot(signal_data, event_path)
+
+    # ** Labeling the waveform **
+    st.subheader("Label this waveform")
+    render_suggestion(suggestion)
+
+    clicked_option, SRF_note, needs_specialist =render_labeling_options(current_status, event_path)
+
+    if clicked_option:
+        save_label(
+            selected_path, event_path, clicked_option, SRF_note, needs_specialist 
+        )
+
+if __name__ == "__main__":
+    main()
+

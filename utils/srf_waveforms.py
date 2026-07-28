@@ -32,17 +32,18 @@ def all_arrays_same_length(dictionary):
 def convert_pv_name_plot_string(raw_name):
     """Make a cryomodule and cavity name for plots"""
     # Case 1: h5 file path
-    match = re.search(r"CM(\d+)/CAV(\d+)/(\d{8})_(\d{6})", raw_name)
+    match = re.search(r"CM(\w+)/CAV(\d+)/(\d{8})_(\d{6})", raw_name)
     if match:
         cm, cav, date_str, time_str = match.groups()
         formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
         formatted_time = f"{time_str[:2]}:{time_str[2:4]}:{time_str[4:6]}"
-        return f"Cryomodule {int(cm)}, Cavity {int(cav)}  |  {formatted_date} {formatted_time}"
+        return f"Cryomodule {cm}, Cavity {int(cav)}  |  {formatted_date} {formatted_time}"
     
     # Case 2: PV name 
     cm, cav = get_cm_cav_num_from_pv(raw_name)
+    print(f"DEBUG case2 cm={repr(cm)} cav={repr(cav)}") 
     if cm and cav:
-        return f"cryomodule {cm}, cavity {cav}" # edit this one the way they you need it 
+        return f"cryomodule {cm}, cavity {cav}" 
          
     print(f"Warning: Could not parse PV name: {raw_name}")
     return raw_name

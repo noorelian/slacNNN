@@ -79,7 +79,7 @@ def load_csv(path):
 
 
 if __name__ == '__main__':
-    h5_file_path = '/Users/nelian/slacNNN/data/quench_data_L0.h5' # Your h5 file path
+    h5_file_path = '/Users/nelian/slacNNN/data/quench_data_L1.h5' # Your h5 file path
     csv_file = '/Users/nelian/slacNNN/config/all_mp_dates.csv' # The mp file 
 
     add_multipacting_flags(file_path=h5_file_path, multipacting_file=csv_file)

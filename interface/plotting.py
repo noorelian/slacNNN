@@ -107,7 +107,7 @@ def build_figure(signal_data, title):
        xaxis=dict(
             title="Time (s)",
            anchor="y",
-           range=[-0.1, 0.1],
+           range=[-0.2, 0.2],
            fixedrange=False,
        ),
        yaxis=dict(

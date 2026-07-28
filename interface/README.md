@@ -20,27 +20,27 @@ git --version
 ---
 
 ## Step 1: Clone the Repository
-
+If you haven't already cloned the repo, clone it
 ```bash
-git clone <repo-url>    # replace with the actual repository URL
+git clone https://github.com/slaclab/slacq.git
+cd slacq
 ```
 
-
-## Step 2: Create a conda Environment 
-
+## Step 2: Create a Conda Environment 
+If you haven't already created a conda environment, use this command to create one:
 ```bash
-conda create -n quench-labeler python=3.12
+conda create -n YOUR_ENV_NAME python=3.12
 ```
 
-## Step 3: Activate the conda Environment
+## Step 3: Activate the Conda Environment
 
 
 ```bash
-conda activate quench-labeler
+conda activate YOUR_ENV_NAME
 ```
 
 ## Step 4: Install Dependencies
-
+If you haven't installed all the dependencies, use this command to install them:
 ```bash
 conda install streamlit plotly h5py numpy pandas
 ```
@@ -80,7 +80,7 @@ The app opens in your browser automatically. If it doesn't, copy that **URL** fr
 ## Troubleshooting: 
 | Problem | Fix |
 |---|---|
-| `streamlit: command not found` | Activate your conda environment `conda activate quench-labeler` and try running again |
+| `streamlit: command not found` | Activate your conda environment `conda activate YOUR_ENV_NAME` and try running again |
 | Nothing happens when you run it | You used `python` instead of `streamlit run` |
 | File not found in the app | The HDF5 path you entered is incorrect |
 | `ModuleNotFoundError` | Make sure you are in the `root` directory |

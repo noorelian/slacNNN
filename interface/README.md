@@ -80,7 +80,7 @@ The app opens in your browser automatically. If it doesn't, copy that **URL** fr
 ## Troubleshooting: 
 | Problem | Fix |
 |---|---|
-| `streamlit: command not found` | Activate your conda environment `conda activate YOUR_ENV_NAME` and try running again |
+| `streamlit: command not found` | Activate your conda environment with `conda activate YOUR_ENV_NAME` and try running again. If it's still not working, you might not have installed Streamlit, use this command to install it: `conda install streamlit`|
 | Nothing happens when you run it | You used `python` instead of `streamlit run` |
 | File not found in the app | The HDF5 path you entered is incorrect |
 | `ModuleNotFoundError` | Make sure you are in the `root` directory |

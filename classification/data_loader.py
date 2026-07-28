@@ -1,29 +1,9 @@
 import h5py
 from pathlib import Path
-from dataclasses import dataclass, fields
-from enum import Enum
-from typing import Iterator, Tuple, Optional
-import numpy as np
-from numpy.typing import NDArray
+from dataclasses import fields
+from typing import Iterator, Tuple
 from utils.config import DATA_DIR
-
-
-@dataclass
-class QuenchData:
-    fault_time: NDArray[np.float64]
-    fault_waveform: NDArray[np.float64]
-    forward_power: NDArray[np.float64]
-    forward_time: NDArray[np.float64]
-    reverse_power: NDArray[np.float64]
-    reverse_time: NDArray[np.float64]
-    decay_reference: Optional[NDArray[np.float64]] = None
-
-
-class QuenchStatus(Enum):
-    real = "real"
-    false = "false"
-    other = "other"
-    cavity_off = "cavity_off"
+from .logic import QuenchData
 
 
 # Traverses HDF5 files to extract and yield quench event datasets

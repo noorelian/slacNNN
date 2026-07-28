@@ -19,8 +19,12 @@ from h5_reader import (
 from utils.quench_data_summary import list_cryomodules, list_cavities, list_years
 from plotting import build_figure, extract_box_range
 from quench_config import SIGNAL_TIME_MAP, LABEL_OPTIONS, LABEL_BUTTONS, LABEL_DISPLAY_TO_STORED, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS
-from utils.srf_waveforms import calculate_loaded_q, validate_quench_lisa
+# from utils.srf_waveforms import calculate_loaded_q, validate_quench_lisa
 from utils.srf_waveforms import convert_pv_name_plot_string
+from classification.logic import classify, QuenchStatus, QuenchData
+
+
+
 
 
 
@@ -290,16 +294,45 @@ def load_event_data_for_classification(path, event_path):
 
 
 def compute_suggestion(signal_data, frequency, saved_q_loaded):
-    """Compute the classification suggestion"""
-    if ("fault_waveform" not in signal_data or frequency is None or saved_q_loaded is None):
+    """Compute the classification suggestion using the classify system written by Norah"""
+
+    # If there is no fault_waveform, we are unable to classify 
+    if "fault_waveform" not in signal_data:
         return None
-    
-    x_fault, y_fault = signal_data["fault_waveform"]    # get the fault waveform time and amplitude 
+
+    x_fault, y_fault = signal_data["fault_waveform"]    # Split the fault_waveform (time, amplitude) tuple into two separate arrays
+
+    # If the forward_power is missing, we can't run the classifier 
+    if "forward_power" not in signal_data:
+        return None
+    x_fwd, y_fwd = signal_data["forward_power"]     # Split the forward_power (time, amplitude) tuple into two separate arrays
+
+    # reverse_power may or may not exist, if missing assign none to the time and amplitude 
+    x_rev, y_rev = signal_data.get("reverse_power", (None, None))
 
     try:
-        return calculate_loaded_q(x_fault, y_fault, frequency, saved_q_loaded)
-    except Exception as e:
-        return {"is_real": None, "loaded_q": np.nan, "other_issue": f"error: {e}"}
+        # Build the QuenchData object 
+        # Convert every array into float for safer math calculations 
+        quench_event = QuenchData(
+            fault_time=np.asarray(x_fault, dtype=float),    
+            fault_waveform=np.asarray(y_fault, dtype=float), 
+            forward_power=np.asarray(y_fwd, dtype=float),
+            forward_time=np.asarray(x_fwd, dtype=float),
+            reverse_power=np.asarray(y_rev, dtype=float) if y_rev is not None else np.array([]), # Reverse power amplitude if available, else an empty array
+            reverse_time=np.asarray(x_rev, dtype=float) if x_rev is not None else np.array([]), # Reverse time if available, else an empty array
+        )
+       
+        if frequency is not None:
+            # Convert frequency into numpy no matter what type of data it came in 
+            quench_event.frequency = float(np.asarray(frequency).flat[0])
+        if saved_q_loaded is not None:
+            # Convert saved_q_loaded into numpy no matter what type of data it came in 
+            quench_event.saved_q_loaded = float(np.asarray(saved_q_loaded).flat[0])
+
+        return classify(quench_event)  # Calls classify function which returns a QuenchStatus [real, false, other or cavoty off]
+    except Exception as e :
+        st.error(f"Classification suggestion has failed: {e}")
+        return None
 
 
 # ** Plot + magnifier **
@@ -359,21 +392,19 @@ def render_zoom_figure(fig, x_range, y_range, event_path):
 
 # Printing the classification 
 def render_suggestion(suggestion):
-    """Show the classification suggestion (Real/False) if the required data is available."""
-    if suggestion is  None: 
-        st.info("Data is unavailable")  # if classificatin couldn't get computed
+    """Show the classification suggestion based on QuenchStatus."""
+    if suggestion is None:
+        st.info("Data is unavailable")
         return
 
-    if suggestion["other_issue"] is not None and suggestion["is_real"] is None: #if failed, display a warning message 
-            st.error(f"Could not provide a suggested classification ({suggestion['other_issue']})")
-            return 
-    
-    suggested_label = "REAL" if suggestion["is_real"] else "FALSE"
-    q_text = f"{suggestion['loaded_q']:.3e}" if np.isfinite(suggestion["loaded_q"]) else "N/A"
-    st.info(
-        f"The system suggests that the given waveform is **{suggested_label}** "
-        f"and the estimated loaded Q = {q_text}"
-    )
+    if suggestion == QuenchStatus.cavity_off:
+        st.info("The system suggests the **cavity was OFF** during this event.")
+    elif suggestion == QuenchStatus.real:
+        st.info("The system suggests that the given waveform is **REAL**.")
+    elif suggestion == QuenchStatus.false:
+        st.info("The system suggests that the given waveform is **FALSE**.")
+    else:  
+        st.info("The system suggests that the given waveform is **OTHER**.")
     
 
 def render_labeling_options(current_status, event_path):
@@ -420,7 +451,7 @@ def save_label(selected_path, event_path, clicked_option, SRF_note, needs_specia
 
 def main():
     st.set_page_config(page_title="Quench Labeler", layout="wide")
-    st.title("Plot a Waveform/Quench")
+    st.title("Quench Labeling Interface")
 
     # ** File Selection **
     selected_path = get_file_path()

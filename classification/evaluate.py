@@ -20,64 +20,53 @@ from .logic import classify
 
 # Runs the classification logic on all provided events
 def run_classification(
-    events_iterator: Iterator[Tuple[str, QuenchData]],
-) -> Dict[str, Any]:
+    events_iterator: Iterator[Tuple[str, str, QuenchData]],
+) -> Dict[str, Tuple[Any, str]]:
     classification_results = {}
-    for event_id, event_data in events_iterator:
+
+    for event_id, filename, event_data in events_iterator:
         label = classify(event_data)
-        classification_results[event_id] = label
+        classification_results[event_id] = (label, filename)
+
     return classification_results
 
 
 # Compares your predicted labels against the true labels and prints any mismatches
 def compare_classification(
-    predictions: Dict[str, Any], ground_truth_file: Path
+    predictions: Dict[str, Tuple[Any, str]], ground_truth_file: Path
 ) -> None:
     correct = 0
     total = 0
 
     with h5py.File(ground_truth_file, "r") as f:
-        for cm_name in f.keys():
-            cm_group = f[cm_name]
+        for event_id, (predicted_enum, source_file) in predictions.items():
+            if event_id in f:
+                event_group = f[event_id]
+                true_label = event_group.attrs.get("quench_labels")
 
-            if isinstance(cm_group, h5py.Group):
-                for cav_name in cm_group.keys():
-                    cav_group = cm_group[cav_name]
+                if true_label is None:
+                    continue
 
-                    if isinstance(cav_group, h5py.Group):
-                        for timestamp, event_group in cav_group.items():
-                            event_id = f"{cm_name}/{cav_name}/{timestamp}"
+                if isinstance(true_label, bytes):
+                    true_label = true_label.decode("utf-8")
 
-                            if event_id in predictions:
-                                true_label = event_group.attrs.get("quench_labels")
+                if str(true_label).strip().lower() == "not_sure":
+                    continue
 
-                                if true_label is None:
-                                    continue
+                total += 1
 
-                                if isinstance(true_label, bytes):
-                                    true_label = true_label.decode("utf-8")
+                predicted_val = (
+                    predicted_enum.value
+                    if hasattr(predicted_enum, "value")
+                    else str(predicted_enum)
+                )
 
-                                if str(true_label).strip().lower() == "not_sure":
-                                    continue
-
-                                total += 1
-                                predicted_enum = predictions[event_id]
-
-                                predicted_val = (
-                                    predicted_enum.value
-                                    if hasattr(predicted_enum, "value")
-                                    else str(predicted_enum)
-                                )
-
-                                if (
-                                    predicted_val.strip().upper()
-                                    == str(true_label).strip().upper()
-                                ):
-                                    correct += 1
-                                else:
-                                    print(
-                                        f"Mismatch on {event_id:32} | Predicted: {predicted_val.lower():5} | Actual: {str(true_label).lower():5}"
-                                    )
+                if predicted_val.strip().upper() == str(true_label).strip().upper():
+                    correct += 1
+                else:
+                    print(
+                        f"Mismatch in {source_file:22} | Event: {event_id:32} | Predicted: {predicted_val.lower():5} | Actual: {str(true_label).lower():5}"
+                    )
 
     if total > 0:
         accuracy = (correct / total) * 100

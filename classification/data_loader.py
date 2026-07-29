@@ -7,7 +7,9 @@ from .logic import QuenchData
 
 
 # Traverses HDF5 files to extract and yield quench event datasets
-def load_quench_events(file_pattern: str = "*.h5") -> Iterator[Tuple[str, QuenchData]]:
+def load_quench_events(
+    file_pattern: str = "*.h5",
+) -> Iterator[Tuple[str, str, QuenchData]]:
     folder = Path(DATA_DIR)
     for h5_file in folder.glob(file_pattern):
         with h5py.File(h5_file, "r") as f:
@@ -32,4 +34,4 @@ def load_quench_events(file_pattern: str = "*.h5") -> Iterator[Tuple[str, Quench
                                 if isinstance(item, h5py.Dataset):
                                     data_dict[field.name] = item[:]
 
-                        yield (event_id, QuenchData(**data_dict))
+                        yield (event_id, h5_file.name, QuenchData(**data_dict))

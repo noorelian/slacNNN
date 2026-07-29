@@ -1,7 +1,7 @@
 """
 Evaluates the accuracy of the quench classification algorithm.
 
-This script automatically loads all raw accelerator data from the local `data/`
+This script automatically loads all data from the local `data/`
 directory, runs the classification logic, and compares the predictions against
 the ground-truth labels in `quench_data_L0_labeled.h5`.
 
@@ -14,7 +14,6 @@ import h5py
 from pathlib import Path
 from typing import Iterator, Tuple, Dict, Any
 from utils.config import DATA_DIR
-
 from .data_loader import QuenchData, load_quench_events
 from .logic import classify
 

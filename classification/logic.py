@@ -28,12 +28,12 @@ def find_quench_time(quench_event_data: QuenchData) -> int:
     return int(np.searchsorted(quench_event_data.fault_time, 0.0))
 
 
-# Verifies that the overall average of the entire fault waveform is greater than 0.1
+# Verifies that the overall average of the entire fault waveform is greater than the threshold
 def is_overall_average_sufficient(quench_event_data: QuenchData) -> bool:
     return bool(np.mean(quench_event_data.fault_waveform) > 0.1)
 
 
-# Evaluates the pre-quench window to confirm the cavity is actively driven
+# Evaluates the pre-quench window to confirm the cavity is on
 def pre_quench_amplitude(quench_event_data: QuenchData, time_0: int) -> bool:
     pre_quench_window = quench_event_data.fault_waveform[0:time_0]
     avg_waveform = np.mean(pre_quench_window)
@@ -46,7 +46,7 @@ def pre_quench_amplitude(quench_event_data: QuenchData, time_0: int) -> bool:
     return bool((avg_waveform >= 0.1) and (avg_fwd_power > 0.01) and (total_avg > 0.2))
 
 
-# Extracts empirical and theoretical decay times to avoid repeating math
+# Calculates measured decay time and expected theoretical decay constant
 def calculate_decay_metrics(
     quench_event_data: QuenchData, time_0: int
 ) -> tuple[float, float]:

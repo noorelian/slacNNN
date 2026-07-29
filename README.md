@@ -20,13 +20,15 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
 2.  **Set up the Directory Structure:**
     ```
     slacq/
+    ├── classification/     
     ├── config/
     ├── data/
     ├── images/
-    └── plotter/
+    ├── interface/   
+    ├── plotter/           
+    └── utils/
     ```
 - Create a data directory and place your .h5 files in it.
-- All python files are located in plotter package.
 - All csv files containing multipacting dates are located in config directory.
 - The images directory is where output plots will be automatically saved.
 
@@ -40,7 +42,7 @@ This project contains Python scripts for analyzing and visualizing SRF cavity qu
 
 4.  **Install Required Python Packages:**
     ```bash
-    pip install numpy pandas h5py matplotlib scipy
+    pip install numpy pandas h5py matplotlib scipy streamlit plotly
     ```
     
 ### Development Tools

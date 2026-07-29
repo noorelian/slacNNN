@@ -14,6 +14,8 @@ class QuenchData:
     reverse_power: NDArray[np.float64]
     reverse_time: NDArray[np.float64]
     decay_reference: Optional[NDArray[np.float64]] = None
+    frequency: float = 1300000000.0
+    saved_q_loaded: float = 40000000.0
 
 
 class QuenchStatus(Enum):
@@ -28,12 +30,12 @@ def find_quench_time(quench_event_data: QuenchData) -> int:
     return int(np.searchsorted(quench_event_data.fault_time, 0.0))
 
 
-# Verifies that the overall average of the entire fault waveform is greater than 0.1
+# Verifies that the overall average of the entire fault waveform is greater than the threshold
 def is_overall_average_sufficient(quench_event_data: QuenchData) -> bool:
     return bool(np.mean(quench_event_data.fault_waveform) > 0.1)
 
 
-# Evaluates the pre-quench window to confirm the cavity is actively driven
+# Evaluates the pre-quench window to confirm the cavity is on
 def pre_quench_amplitude(quench_event_data: QuenchData, time_0: int) -> bool:
     pre_quench_window = quench_event_data.fault_waveform[0:time_0]
     avg_waveform = np.mean(pre_quench_window)
@@ -46,7 +48,7 @@ def pre_quench_amplitude(quench_event_data: QuenchData, time_0: int) -> bool:
     return bool((avg_waveform >= 0.1) and (avg_fwd_power > 0.01) and (total_avg > 0.2))
 
 
-# Extracts empirical and theoretical decay times to avoid repeating math
+# Calculates measured decay time and expected theoretical decay constant
 def calculate_decay_metrics(
     quench_event_data: QuenchData, time_0: int
 ) -> tuple[float, float]:
@@ -66,9 +68,9 @@ def calculate_decay_metrics(
 
     t1 = decay_time[idx_1] - decay_time[0]
 
-    freq = getattr(quench_event_data, "frequency", 1300000000.0)
-    q_loaded = getattr(quench_event_data, "saved_q_loaded", 4e7)
-    expected_tau = q_loaded / (np.pi * freq)
+    expected_tau = quench_event_data.saved_q_loaded / (
+        np.pi * quench_event_data.frequency
+    )
 
     return float(t1), float(expected_tau)
 

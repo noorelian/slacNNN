@@ -32,6 +32,9 @@ def load_quench_events(
                             if field.name in event_group:
                                 item = event_group[field.name]
                                 if isinstance(item, h5py.Dataset):
-                                    data_dict[field.name] = item[:]
+                                    if item.shape == ():
+                                        data_dict[field.name] = item[()]
+                                    else:
+                                        data_dict[field.name] = item[:]
 
                         yield (event_id, h5_file.name, QuenchData(**data_dict))

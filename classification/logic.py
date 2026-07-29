@@ -14,6 +14,8 @@ class QuenchData:
     reverse_power: NDArray[np.float64]
     reverse_time: NDArray[np.float64]
     decay_reference: Optional[NDArray[np.float64]] = None
+    frequency: float = 1300000000.0
+    saved_q_loaded: float = 40000000.0
 
 
 class QuenchStatus(Enum):
@@ -66,9 +68,9 @@ def calculate_decay_metrics(
 
     t1 = decay_time[idx_1] - decay_time[0]
 
-    freq = getattr(quench_event_data, "frequency", 1300000000.0)
-    q_loaded = getattr(quench_event_data, "saved_q_loaded", 4e7)
-    expected_tau = q_loaded / (np.pi * freq)
+    expected_tau = quench_event_data.saved_q_loaded / (
+        np.pi * quench_event_data.frequency
+    )
 
     return float(t1), float(expected_tau)
 

@@ -1,17 +1,41 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import h5py
 import pandas as pd
 import numpy as np
+from utils.srf_waveforms import parse_h5_event_path
+from utils.quench_data_summary import load_csv
+from interface.h5_reader import find_event_groups
 
 def add_multipacting_flags(file_path, multipacting_file, flag_attr='Multipacting'):
     """
     Add a multipacting flag to each events in the h5 file
     - The function matches the event name in the h5 file with the data in the csv file 
     - Each event in the h5 file gets a boolean attribute so either true or false 
-    - Match only after ignoring the time (HHMMSS) in the h5 file since the events are saved with no time records
+    - Match only after ignoring the time (HHMMSS) in the h5 file since the events in the csv file are saved with no time records
     """
-    dataframe = load_csv(multipacting_file) # Load the csv file into a dataframe 
+    dataframe = load_csv(multipacting_file) # Load the csv file into a dataframe
+    multipacting_keys = build_multipacting_keys(dataframe)
 
-    # build a set of keys to identify each multipacting event
+    matched = 0     # flagged multipacting events 
+    total = 0       # valid processed events 
+
+    # read the h5 file 
+    with h5py.File(file_path, 'a') as f :
+        event_paths = find_event_groups(f)
+
+        # Loop over each path 
+        for path in event_paths:
+           is_valid, is_multipacting = flag_event(f, path, multipacting_keys, flag_attr)
+           if is_valid:
+            total += 1
+            if is_multipacting:
+                 matched += 1        # Increment the multipacting events counter 
+
+
+# build a set of keys to identify each multipacting event
+def build_multipacting_keys(dataframe):
     multipacting_keys = set()
     for _, row in dataframe.iterrows():
         key =(
@@ -23,76 +47,28 @@ def add_multipacting_flags(file_path, multipacting_file, flag_attr='Multipacting
         )
         multipacting_keys.add(key)
 
-    matched = 0     # flagged multipacting events 
-    total = 0       # valid processed events 
+    return multipacting_keys
 
-    # read the h5 file 
-    with h5py.File(file_path, 'a') as f :
-        event_paths = []
-        f.visit(lambda name: event_paths.append(name))
+def flag_event(f, path, multipacting_keys, flag_attr):
+    parsed = parse_h5_event_path(path)
+    if not parsed:
+        return False, False
 
-        # Loop over each path 
-        for path in event_paths:
-            parts = path.split('/')     # split like this ['CM01', 'CAV1', '20240116_103022']
+    cm, cav, date_str, _time_str = parsed
+    year, month, day = date_str[:4], date_str[4:6], date_str[6:8]
 
-            # A valid event has exactly 3 parts: CM / CAV / timestamp
-            # Skip anything else (like top level CM or CAV groups)
-            if len(parts) != 3:
-                continue
+    event_key = (cm.strip(), cav.strip(), year, month, day)
 
-            cm, cav, timestamp = parts  # Split the 3 parts into cryomodule, cavity and timestamp variables
+    is_multipacting = event_key in multipacting_keys        # Check if the event is in the multipcating set 
+    f[path].attrs[flag_attr] = bool(is_multipacting)        # Write the boolean result back to the h5 file
 
-            if '_' not in timestamp or len(timestamp.split('_')[0]) != 8:
-                continue
-                # if the event is missing any of those parts, then skip it 
-
-            date_part = timestamp.split('_')[0]     # Extract the date without the (HHMMSS)
-            year = date_part[0:4]                   # First 4 charcters are the year
-            month = date_part[4:6]                  # The next 2 are the month 
-            day = date_part[6:8]                    # The last 2 are the day 
-
-            event_key = (cm.strip(), cav.strip(), year, month, day)
-            total += 1
-
-            is_multipacting = event_key in multipacting_keys        # Check if the event is in the multipcating set 
-            f[path].attrs[flag_attr] = bool(is_multipacting)        # Write the boolean result back to the h5 file
-
-            if is_multipacting:
-                matched += 1        # Increment the multipacting events counter 
-
-def load_csv(path):
-    """
-    load the csv or txt files into pandas dataframe 
-
-    - csv files are read direclty 
-    - txt files are comma-seperated first, if that fails it fall back to whitespace-seperated 
-    - Otherwise, it throws an error 
-    """
-    if path.endswith('.csv'):
-        return pd.read_csv(path)
-    elif path.endswith('.txt'):
-        try:
-            return pd.read_csv(path)
-        except Exception:
-            return pd.read_csv(path, delim_whitespace=True)
-    else:
-        raise ValueError(f"Error with file type: {path}")
+    return True, is_multipacting
 
 
 if __name__ == '__main__':
     # Change those two fields:
-    h5_file_path = '/Users/yourname/data/quench_data_L1.h5' # Your h5 file path
-    csv_file = '/Users/yourname/config/all_mp_dates.csv' # The mp file 
+    h5_file_path = '/Users/nelian/slacNNN/data/quench_data_L0.h5' # Your h5 file path
+    csv_file = '/Users/nelian/slacNNN/data/all_mp_dates.csv' # The mp file 
 
     add_multipacting_flags(file_path=h5_file_path, multipacting_file=csv_file)
-
-    with h5py.File(h5_file_path, 'r') as f:
-        event_paths = []
-        f.visit(lambda name: event_paths.append(name))
-
-        for path in event_paths:
-            if len(path.split('/')) != 3:
-                continue
-            obj = f[path]
-            print(path, ":", dict(obj.attrs))
 

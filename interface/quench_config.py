@@ -57,7 +57,6 @@ CHECKED = "checked" # checked or unchecked(True or false)
 NOTE = "note"  # note BY CHECKER 
 CHECKED_AT = "checked_at" # TIME WHEN CHECKED
 NEEDS_SPECIALIST = "needs_specialist" # someone should go and chcek the cavity 
-QUENCH_CLASSIFICATION = "quench_classification_suggestion"
 
 # used for classification suggestion
 FREQUENCY_KEYS = ["frequency", "FREQ"] #used for searching for the cavity frequency 

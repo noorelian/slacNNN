@@ -103,12 +103,12 @@ def build_figure(signal_data, title):
            fig.add_trace(trace)
 
     fig.update_layout(
-       title=title,
-       xaxis=dict(
+        title=title,
+        xaxis=dict(
             title="Time (s)",
-           anchor="y",
-           range=[-0.2, 0.2],
-           fixedrange=False,
+            anchor="y",
+            range=[-0.2, 0.2],
+            fixedrange=False,
        ),
        yaxis=dict(
            title="Amplitude (MV)",
@@ -129,7 +129,12 @@ def build_figure(signal_data, title):
        template="plotly_white",
        width=900,
        height=700,
-       legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+       legend=dict(orientation="h", 
+                   yanchor="bottom", 
+                   y=1.02, 
+                   xanchor="left", 
+                   x=0
+        ),
        dragmode="select",
        uirevision=title,
    )

@@ -14,81 +14,27 @@ from utils.h5_reader import (
     write_label,
     #parse_event_path,
     find_event_groups,
+    load_signal_data,
+    load_event_data_for_classification,
 )
 
 from utils.quench_data_summary import list_cryomodules, list_cavities, list_years
 from plotting import build_figure, extract_box_range
-from quench_config import SIGNAL_TIME_MAP, LABEL_OPTIONS, LABEL_BUTTONS, LABEL_DISPLAY_TO_STORED, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS
+from quench_config import (
+    LABEL_OPTIONS, 
+    LABEL_BUTTONS, 
+    LABEL_DISPLAY_TO_STORED, 
+    LABELS,
+    CHECKED,
+    NOTE, 
+    CHECKED_AT,
+    NEEDS_SPECIALIST
+)
 # from utils.srf_waveforms import calculate_loaded_q, validate_quench_lisa
 from utils.srf_waveforms import convert_pv_name_plot_string
 from classification.logic import classify, QuenchStatus, QuenchData
+from utils.label_helpers import normalize_label, display_label, checked_status, format_event_status, event_matches_label
 
-
-
-def to_string(value):
-    """ Decode byte attributes to string."""
-    return value.decode() if isinstance(value, bytes) else value 
-
-
-def normalize_label(label):
-    """Normalize any label to a canonical form so case, spaces, and
-    underscores never matter. 'NOT SURE', 'not_sure', 'Not Sure' all match."""
-    label = to_string(label)
-
-    if not label:
-        return ""          
-    return str(label).strip().lower().replace(" ", "_")
-
-def display_label(status, unlabeled="Unlabeled"):
-    """Uppercased, human readable label, or unlabeled if nothing is set."""
-    label =normalize_label(status["label"])
-    return label.upper() if label else unlabeled 
-
-
-# A helper function that is responsible for the status of the file in the dropdown
-def checked_status(event_path, event_status):
-    """Format an event's dropdown label: name | checked | label."""
-    status = event_status[event_path]
-    event_name = convert_pv_name_plot_string(event_path)
-    if status["checked"]:
-        label = normalize_label(status["label"])
-        label = label.upper() if label else "UNLABELED"
-        return f"{event_name}   |   Checked: Yes    |   Label: {label}"
-    return f"{event_name}   |   Checked: No |   Label: unlabeled"
-
-
-def build_summary_table(display_name, checked, label, note, flag, when):
-    """Build a markdown table for each event."""
-    return f"""
-    | **Event name**                        | {display_name}                      |
-    |---------------------------------------|-------------------------------------|
-    | **Checked**                           | {checked}                           |
-    | **Label**                             | {label}                             |
-    | **Note**                              | {note}                              |
-    | **Need a specialist to inspect the cavity** | {flag}                        |
-    | **Last updated**                      | {when}                              |
-    """
-
-# A function to format the event status(checked or unchecked), label(Real or False or Other) and note
-def format_event_status(event_path, status):
-    """Render an event's status as a markdown table."""
-    checked = "Yes" if status["checked"] else "No"
-    label = normalize_label(status["label"])
-    label = label.upper() if label else "Unlabeled"
-
-    note = status["note"] 
-    if isinstance(note, bytes):
-        note = note.decode()
-    note = note if note else "None"
-    when = status["checked_at"] if status["checked_at"] else ""
-    if isinstance(when, bytes):
-        when = when.decode()
-
-    flag = "Yes" if status["needs_specialist"] else "No"
-
-    display_name = convert_pv_name_plot_string(event_path).replace("|", "\\|")
-
-    return build_summary_table(display_name, checked, label, note, flag, when)
 
 @st.cache_data(show_spinner=False)
 def cached_cryomodules(path, mtime):
@@ -116,11 +62,11 @@ def cached_events(path, mtime, cm, cav, year):
         for event in events:
             attrs = f[event].attrs
             event_status[event] = {
-                "checked": bool(attrs.get("checked", False)),
-                "label": attrs.get("quench_labels", None),
-                "note": attrs.get("note", None),
-                "checked_at": attrs.get("checked_at", None),
-                "needs_specialist": bool(attrs.get("needs_specialist", False)),
+                "checked": bool(attrs.get(CHECKED, False)),
+                "label": attrs.get(LABELS, None),
+                "note": attrs.get(NOTE, None),
+                "checked_at": attrs.get(CHECKED_AT, None),
+                "needs_specialist": bool(attrs.get(NEEDS_SPECIALIST, False)),
             }
     return events, event_status
 
@@ -198,22 +144,6 @@ def get_events(selected_path, file_mtime, cm_filter, cav_filter, year_filter):
     return events, event_status
 
 
-def event_matches_label(event_path, event_status, target_label):
-    """This function is used for the label filter"""
-    if target_label == "All":
-        return True
-    
-    status = event_status[event_path]
-    label = normalize_label(status["label"])
-
-    if target_label == "Unlabeled":
-        return(not status["checked"]) or (not label)
-    
-    target = LABEL_DISPLAY_TO_STORED.get(target_label.upper(), target_label)
-    target = normalize_label(target)
-    
-    return label == target
-
 def filter_events_by_label(events, event_status, label):
     """This function is used to filter events by label"""
     if label == "All":
@@ -251,43 +181,6 @@ def show_event_status(event_path, current_status):
 
     if current_status["needs_specialist"]:
         st.warning("A specialist needs to inspect the cavity")
-
-
-# ** Load waveform data for the selected event **
-def load_signal_data(group):
-    """Load signals data (decay_ref, fault_waveform, forward_power, reverse_power)."""
-    signal_data = {}
-
-    for signal_name, time in SIGNAL_TIME_MAP.items():
-        if signal_name not in group:  # if an event is missing some signals like the very first ones in 2022 (they are missing the decay reference), skip the missing items 
-            continue
-
-        y = np.array(group[signal_name])    # load the signals into array 
-        x = None
-
-        if time in group:
-            t = np.array(group[time])  # load time data into array 
-            # only assign t to x if its shape matches that of y 
-            if t.shape[0] == y.shape[0]:
-                x = t
-
-        if x is None:
-            x = np.arange(y.shape[0])   # if no time is available, create an x-axis starts from 0 to the length of y 
-
-        signal_data[signal_name] = (x, y)   # store the loaded signal data 
-
-    return signal_data
-
-
-# ** Classification suggestion **
-def load_event_data_for_classification(path, event_path):
-    """load frequency and saved_Q for computing the classsification suggestion"""
-    with h5py.File(path, "r") as f:
-        group = f[event_path]
-        signal_data = load_signal_data(group)
-        frequency = get_scalar(group, FREQUENCY_KEYS)   #read cavity frequency 
-        saved_q_loaded = get_scalar(group, SAVED_Q_LOADED_KEYS) #read the saved loaded Q
-    return signal_data, frequency, saved_q_loaded
 
 
 def compute_suggestion(signal_data, frequency, saved_q_loaded):
@@ -330,7 +223,6 @@ def compute_suggestion(signal_data, frequency, saved_q_loaded):
     except Exception as e :
         st.error(f"Classification suggestion has failed: {e}")
         return None
-
 
 # ** Plot + magnifier **
 def render_plot(signal_data, event_path):
@@ -470,7 +362,7 @@ def main():
     show_event_status(event_path, current_status)
 
     # ** Compute Classification Suggestion **
-    signal_data, frequency, saved_q_loaded, = load_event_data_for_classification(selected_path, event_path)
+    signal_data, frequency, saved_q_loaded = load_event_data_for_classification(selected_path, event_path)
     suggestion = compute_suggestion(signal_data, frequency, saved_q_loaded)
 
     # ** Plot + magnifier **

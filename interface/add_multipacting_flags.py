@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from utils.srf_waveforms import parse_h5_event_path
 from utils.quench_data_summary import load_csv
-from interface.h5_reader import find_event_groups
+from utils.h5_reader import find_event_groups
 
 def add_multipacting_flags(file_path, multipacting_file, flag_attr='Multipacting'):
     """

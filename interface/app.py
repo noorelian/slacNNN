@@ -8,7 +8,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import streamlit as st
 
-from h5_reader import (
+from utils.h5_reader import (
     get_scalar,
     #suggest_classification,
     write_label,

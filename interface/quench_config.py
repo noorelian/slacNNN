@@ -13,7 +13,6 @@ SIGNAL_TIME_MAP = {
     "decay_reference": "forward_time",  
 }
 
-LABEL_OPTIONS = ["All", "REAL", "FALSE", "OTHER", "Unlabeled", "NOT SURE", "CAVITY OFF"]
 # Styles for the plot
 STYLES = {
    'fault_waveform':  {'color': 'indigo', 'linestyle': '-',  'linewidth': 3, 'alpha': 1.0,
@@ -34,7 +33,7 @@ STYLES = {
 LINE_STYLES = {"-": "solid", "--": "dash", ":": "dot", "-.": "dashdot"}
 MARKERS = {"o": "circle", "x": "x", "s": "square", "^": "triangle-up", "d": "diamond"}
 
-LABEL_BUTTONS = [
+LABEL_DEFINITIONS = [
     ("REAL", "real"),
     ("FALSE", "false"),
     ("OTHER", "other"),
@@ -42,14 +41,11 @@ LABEL_BUTTONS = [
     ("Cavity Off", "cavity_off"),
 ]
 
-LABEL_DISPLAY_TO_STORED = {
-    "REAL": "real",
-    "FALSE": "false",
-    "OTHER": "other",
-    "NOT SURE": "not_sure",
-    "CAVITY OFF": "cavity_off",
-    "UNLABELED": "",
-}
+LABEL_OPTIONS = ["All"] + [display for display, _ in LABEL_DEFINITIONS] + ["Unlabeled"] # For filters dropdown
+LABEL_BUTTONS = LABEL_DEFINITIONS # Labeling buttons 
+LABEL_DISPLAY_TO_STORED = {display: stored for display, stored in LABEL_DEFINITIONS} # For filter lookup
+LABEL_DISPLAY_TO_STORED["UNLABELED"] = ""
+
 
 # the attributes used for lableing the events 
 LABELS = "quench_labels" # REAL, FALSE OR OTHER 

@@ -11,37 +11,73 @@ from quench_config import (
     CHECKED_AT,
     NEEDS_SPECIALIST,
     LOADED_Q_CHANGE_FOR_QUENCH,
+    FREQUENCY_KEYS,
+    SAVED_Q_LOADED_KEYS,
+
 )
 from utils.quench_data_summary import list_cavities, has_signal
 
 
 
-def get_scalar(group, keys):
-    """
-    This function is used for extracting a single scalar value (frequency, saved Q) 
-    from the h5 file to compute the REAL/ FALSE classification suggestion
-    """
-    
-    for key in keys:
-        # Case1: the key is a dataset and it is stored inside the group 
-        if key in group:
-            try:
-                # If it's an array, take the first element using flat[0]
-                arr = np.asarray(group[key]) 
-                return float(arr.flat[0]) if arr.shape else float(arr)
-            except Exception:
+
+def find_event_groups(hdf5_file, cm=None, cav=None, year=None):
+    """This function is for finding each event groups/identifiers (decay ref, forward power, fault waveform) for each cm/cav/date, used for plotting """
+    events = []
+    def collect_from_cavity_group(cav_group, cav_path):
+        for name, obj in cav_group.items():
+            if not isinstance(obj, h5py.Group):
                 continue
-        # Case2: the key is stored as an attribute 
-        if key in group.attrs:
-            try:
-                val = group.attrs[key]
-                # decode to a string first if the attribute is stored as bytes 
-                if isinstance(val, bytes):
-                    val = val.decode()
-                return float(val)
-            except Exception:
+            if year and not name.startswith(year):
                 continue
-    return None
+            if has_signal(obj):
+                events.append(f"{cav_path}/{name}")
+ 
+    if cm and cav:
+        if cm in hdf5_file and cav in hdf5_file[cm]:
+            collect_from_cavity_group(hdf5_file[cm][cav], f"{cm}/{cav}")
+    elif cm:
+        if cm in hdf5_file:
+            for cav_name in list_cavities(hdf5_file, cm):
+                collect_from_cavity_group(hdf5_file[cm][cav_name], f"{cm}/{cav_name}")
+    else:
+
+        def visitor(name, obj):
+            """ This function is for exploring the h5 file structure"""
+            if isinstance(obj, h5py.Group) and has_signal(obj):
+                if year and not name.split("/")[-1].startswith(year):
+                    return
+                #keys = set(obj.keys())
+                #if keys & set(SIGNAL_TIME_MAP.keys()):
+                events.append(name)
+
+        hdf5_file.visititems(visitor)
+    return sorted(events)
+
+# ** Load waveform data for the selected event **
+def load_signal_data(group):
+    """Load signals data (decay_ref, fault_waveform, forward_power, reverse_power)."""
+    signal_data = {}
+
+    for signal_name, time in SIGNAL_TIME_MAP.items():
+        if signal_name not in group:  # if an event is missing some signals like the very first ones in 2022 (they are missing the decay reference), skip the missing items 
+            continue
+
+        y = np.array(group[signal_name])    # load the signals into array 
+        x = None
+
+        if time in group:
+            t = np.array(group[time])  # load time data into array 
+            # only assign t to x if its shape matches that of y 
+            if t.shape[0] == y.shape[0]:
+                x = t
+
+        if x is None:
+            x = np.arange(y.shape[0])   # if no time is available, create an x-axis starts from 0 to the length of y 
+
+        signal_data[signal_name] = (x, y)   # store the loaded signal data 
+
+    return signal_data
+
 
 
 """
@@ -98,38 +134,43 @@ def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
 
 """
 
-def find_event_groups(hdf5_file, cm=None, cav=None, year=None):
-    """This function is for finding each event groups/identifiers (decay ref, forward power, fault waveform) for each cm/cav/date, used for plotting """
-    events = []
-    def collect_from_cavity_group(cav_group, cav_path):
-        for name, obj in cav_group.items():
-            if not isinstance(obj, h5py.Group):
-                continue
-            if year and not name.startswith(year):
-                continue
-            if has_signal(obj):
-                events.append(f"{cav_path}/{name}")
- 
-    if cm and cav:
-        if cm in hdf5_file and cav in hdf5_file[cm]:
-            collect_from_cavity_group(hdf5_file[cm][cav], f"{cm}/{cav}")
-    elif cm:
-        if cm in hdf5_file:
-            for cav_name in list_cavities(hdf5_file, cm):
-                collect_from_cavity_group(hdf5_file[cm][cav_name], f"{cm}/{cav_name}")
-    else:
+# ** Classification suggestion **
+def load_event_data_for_classification(path, event_path):
+    """load frequency and saved_Q for computing the classsification suggestion"""
+    with h5py.File(path, "r") as f:
+        group = f[event_path]
+        signal_data = load_signal_data(group)
+        frequency = get_scalar(group, FREQUENCY_KEYS)   #read cavity frequency 
+        saved_q_loaded = get_scalar(group, SAVED_Q_LOADED_KEYS) #read the saved loaded Q
+    return signal_data, frequency, saved_q_loaded
 
-        def visitor(name, obj):
-            """ This function is for exploring the h5 file structure"""
-            if isinstance(obj, h5py.Group) and has_signal(obj):
-                if year and not name.split("/")[-1].startswith(year):
-                    return
-                #keys = set(obj.keys())
-                #if keys & set(SIGNAL_TIME_MAP.keys()):
-                events.append(name)
 
-        hdf5_file.visititems(visitor)
-    return sorted(events)
+def get_scalar(group, keys):
+    """
+    This function is used for extracting a single scalar value (frequency, saved Q) 
+    from the h5 file to compute the REAL/ FALSE classification suggestion
+    """
+    
+    for key in keys:
+        # Case1: the key is a dataset and it is stored inside the group 
+        if key in group:
+            try:
+                # If it's an array, take the first element using flat[0]
+                arr = np.asarray(group[key]) 
+                return float(arr.flat[0]) if arr.shape else float(arr)
+            except Exception:
+                continue
+        # Case2: the key is stored as an attribute 
+        if key in group.attrs:
+            try:
+                val = group.attrs[key]
+                # decode to a string first if the attribute is stored as bytes 
+                if isinstance(val, bytes):
+                    val = val.decode()
+                return float(val)
+            except Exception:
+                continue
+    return None
 
 
 def write_label(file_path, event_path, label, srf_note, needs_specialist):

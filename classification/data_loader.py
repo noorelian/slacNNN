@@ -1,35 +1,16 @@
 import h5py
 from pathlib import Path
-from dataclasses import dataclass, fields
-from enum import Enum
-from typing import Iterator, Tuple, Optional
-import numpy as np
-from numpy.typing import NDArray
+from dataclasses import fields
+from typing import Iterator, Tuple
 from utils.config import DATA_DIR
-
-
-@dataclass
-class QuenchData:
-    fault_time: NDArray[np.float64]
-    fault_waveform: NDArray[np.float64]
-    forward_power: NDArray[np.float64]
-    forward_time: NDArray[np.float64]
-    reverse_power: NDArray[np.float64]
-    reverse_time: NDArray[np.float64]
-    decay_reference: Optional[NDArray[np.float64]] = None
-
-
-class QuenchStatus(Enum):
-    real = "real"
-    false = "false"
-    other = "other"
-    cavity_off = "cavity_off"
+from .logic import QuenchData
 
 
 # Traverses HDF5 files to extract and yield quench event datasets
-def load_quench_events(file_pattern: str = "*.h5") -> Iterator[Tuple[str, QuenchData]]:
+def load_quench_events(
+    file_pattern: str = "*.h5",
+) -> Iterator[Tuple[str, str, QuenchData]]:
     folder = Path(DATA_DIR)
-    # Use the argument instead of hardcoding the string here
     for h5_file in folder.glob(file_pattern):
         with h5py.File(h5_file, "r") as f:
             for cm_name, cm_group in f.items():
@@ -51,6 +32,6 @@ def load_quench_events(file_pattern: str = "*.h5") -> Iterator[Tuple[str, Quench
                             if field.name in event_group:
                                 item = event_group[field.name]
                                 if isinstance(item, h5py.Dataset):
-                                    data_dict[field.name] = item[:]
+                                    data_dict[field.name] = item[()]
 
-                        yield (event_id, QuenchData(**data_dict))
+                        yield (event_id, h5_file.name, QuenchData(**data_dict))

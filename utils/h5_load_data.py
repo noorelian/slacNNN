@@ -4,8 +4,6 @@ from numpy.typing import NDArray
 from typing import Optional, Iterator, Tuple
 from dataclasses import dataclass, fields
 from pathlib import Path
-
-# Adjust this import to match where DATA_DIR actually lives in your project
 from utils.config import DATA_DIR
 
 
@@ -22,9 +20,7 @@ class QuenchData:
     saved_q_loaded: float = 40000000.0
 
 
-"""Extracts datasets from a single HDF5 group into a QuenchData dataclass"""
-
-
+# Extracts datasets from a single HDF5 group into a QuenchData dataclass
 def extract_quench_data(group: h5py.Group) -> QuenchData:
     data_dict = {}
 
@@ -39,9 +35,7 @@ def extract_quench_data(group: h5py.Group) -> QuenchData:
     return QuenchData(**data_dict)
 
 
-"""Traverses HDF5 files to extract and yield quench event datasets"""
-
-
+# Traverses HDF5 files to extract and yield quench event datasets
 def load_quench_events(
     file_pattern: str = "*.h5",
 ) -> Iterator[Tuple[str, str, QuenchData]]:

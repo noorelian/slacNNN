@@ -248,6 +248,25 @@ def load_quench_waveforms(events, source):
                         }
     return out
 
+def load_csv(path):
+    """
+    load the csv or txt files into pandas dataframe 
+
+    - csv files are read direclty 
+    - txt files are comma-seperated first, if that fails it fall back to whitespace-seperated 
+    - Otherwise, it throws an error 
+    """
+    if path.endswith('.csv'):
+        return pd.read_csv(path)
+    elif path.endswith('.txt'):
+        try:
+            return pd.read_csv(path)
+        except Exception:
+            return pd.read_csv(path, delim_whitespace=True)
+    else:
+        raise ValueError(f"Error with file type: {path}")
+
+
 def list_cryomodules(h5_file):
     "This function is used for the events filter in the interface"
     return sorted(k for k in h5_file.keys() if re.fullmatch(r"CM\d+", k))

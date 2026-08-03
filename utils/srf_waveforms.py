@@ -28,13 +28,19 @@ def all_arrays_same_length(dictionary):
     lengths = (len(arr) for arr in dictionary.values())
     return len(set(lengths)) == 1
 
+def parse_h5_event_path(raw_name):
+    match = re.search(r"CM(\w+)/CAV(\d+)/(\d{8})_(\d{6})", raw_name)
+    if not match:
+        return None
+    cm, cav, date_str, time_str = match.groups()
+    return cm, cav, date_str, time_str
 
 def convert_pv_name_plot_string(raw_name):
     """Make a cryomodule and cavity name for plots"""
     # Case 1: h5 file path
-    match = re.search(r"CM(\w+)/CAV(\d+)/(\d{8})_(\d{6})", raw_name)
-    if match:
-        cm, cav, date_str, time_str = match.groups()
+    parsed = parse_h5_event_path(raw_name)
+    if parsed:
+        cm, cav, date_str, time_str = parsed
         formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
         formatted_time = f"{time_str[:2]}:{time_str[2:4]}:{time_str[4:6]}"
         return f"Cryomodule {cm}, Cavity {int(cav)}  |  {formatted_date} {formatted_time}"

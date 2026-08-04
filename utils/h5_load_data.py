@@ -1,23 +1,54 @@
 import h5py
 import numpy as np
+import pandas as pd
+from datetime import datetime
 from numpy.typing import NDArray
-from typing import Optional, Iterator, Tuple, Dict
-from dataclasses import dataclass, fields
+from typing import Iterator, Tuple, Dict
+from dataclasses import fields
 from pathlib import Path
-from utils.config import DATA_DIR
+from utils.config import DATA_DIR, H5_GLOB, DataBundle, QuenchData
 
 
-@dataclass
-class QuenchData:
-    fault_time: NDArray[np.float64]
-    fault_waveform: NDArray[np.float64]
-    forward_power: NDArray[np.float64]
-    forward_time: NDArray[np.float64]
-    reverse_power: NDArray[np.float64]
-    reverse_time: NDArray[np.float64]
-    decay_reference: Optional[NDArray[np.float64]] = None
-    frequency: float = 1300000000.0
-    saved_q_loaded: float = 40000000.0
+# # Iterates through all HDF5 events to format a DataBundle with physically sorted pandas DataFrames for plotting
+def build_plotter_bundle() -> DataBundle:
+    records = []
+
+    for event_id, filename, quench_data in load_quench_events(H5_GLOB):
+        cm, cav, timestamp_str = event_id.split("/")
+
+        dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+
+        records.append(
+            {
+                "cm": cm,
+                "cav": cav,
+                "year": str(dt.year),
+                "month": str(dt.month),
+                "day": str(dt.day),
+                "classification": getattr(quench_data, "quench_classification", "real"),
+                "is_mp": False,
+            }
+        )
+
+    events = pd.DataFrame(records)
+    print(f"Loaded {len(events)} quench events from {H5_GLOB}")
+
+    CM_ORDER = ["CM01", "CM02", "CM03", "CMH1", "CMH2"] + [
+        f"CM{n:02d}" for n in range(4, 36)
+    ]
+    present = [cm for cm in CM_ORDER if cm in set(events["cm"])]
+    events["cm"] = pd.Categorical(events["cm"], categories=present, ordered=True)
+
+    events_no_hl = events[~events["cm"].isin(["CMH1", "CMH2"])]
+    real_events = events_no_hl[events_no_hl["classification"] == "real"]
+    nomp_nohl_real_all = real_events[~real_events["is_mp"]]
+
+    return DataBundle(
+        all_events=events,
+        events_no_hl=events_no_hl,
+        real_events=real_events,
+        nomp_nohl_real_all=nomp_nohl_real_all,
+    )
 
 
 # Extracts datasets from a single HDF5 group into a QuenchData dataclass

@@ -34,11 +34,11 @@ def extract_quench_data(group: h5py.Group) -> QuenchData:
 
     if "frequency" not in data_dict:
         if "FREQ" in group.attrs:
-            data_dict["frequency"] = float(group.attrs["FREQ"])
+            data_dict["frequency"] = float(group.attrs["FREQ"])  # type: ignore
 
     if "saved_q_loaded" not in data_dict:
         if "QLOADED" in group.attrs:
-            data_dict["saved_q_loaded"] = float(group.attrs["QLOADED"])
+            data_dict["saved_q_loaded"] = float(group.attrs["QLOADED"])  # type: ignore
 
     return QuenchData(**data_dict)
 
@@ -49,7 +49,7 @@ def load_event_waveform_data(
 ) -> Tuple[Dict[str, Tuple[NDArray, NDArray]], float, float]:
     with h5py.File(file_path, "r") as f:
         group = f[event_path]
-        quench_data = extract_quench_data(group)
+        quench_data = extract_quench_data(group)  # type: ignore
 
     signal_data = {}
     signal_time_map = {

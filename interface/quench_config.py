@@ -3,7 +3,6 @@ POWER_SIGNALS = {
    "reverse_power",
 }
 
-#MW_TO_KW = 1000.0
 HEADROOM =  1.30        # 30% white space above the peak
 
 SIGNAL_TIME_MAP = {
@@ -23,10 +22,6 @@ STYLES = {
                         'marker': 'x', 'markersize': 6, 'markevery': 50},  
     'decay_reference': {'color': 'darkcyan', 'linestyle': ':',  'linewidth': 3, 'alpha': 1.0,
                         'marker': None},                       
-   # 'fault_waveform': {'color': 'indigo', 'linestyle': '-', 'linewidth': 3, 'alpha': 0.5},
-   # 'forward_power': {'color': 'green', 'marker': 'o', 'markersize':3, 'markevery':30},
-    #'reverse_power': {'color': 'orange', 'marker': 'x', 'markersize':3, 'markevery':30},
-    #'decay_reference': {'color': 'darkcyan', 'linestyle': '--', 'linewidth': 3, 'alpha':0.5},
 }
 
 #fig, ax = plt.subplots(figsize=(7, 3.5))

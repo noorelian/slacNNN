@@ -1,3 +1,5 @@
+import re
+
 from utils.srf_waveforms import convert_pv_name_plot_string
 from interface.quench_config import LABEL_DISPLAY_TO_STORED
 
@@ -15,6 +17,14 @@ def normalize_label(label):
     if not label:
         return ""          
     return str(label).strip().lower().replace(" ", "_")
+
+def norm_cm(cm):
+    digits = re.sub(r"\D", "", str(cm))
+    return digits
+
+def norm_cav(cav):
+    digits = re.sub(r"\D", "", str(cav))
+    return digits
 
 def display_label(status, unlabeled="Unlabeled"):
     """Uppercased, human readable label, or unlabeled if nothing is set."""

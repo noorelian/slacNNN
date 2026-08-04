@@ -2,6 +2,7 @@ import plotly.graph_objects as go
 from quench_config import POWER_SIGNALS, HEADROOM, STYLES, LINE_STYLES, MARKERS
 
 
+
 def plot_style(signal_name, x, y):
     """This function is responsible for plotting using markers, dash, line ...etc"""
     style = STYLES.get(signal_name, {})
@@ -135,7 +136,7 @@ def build_figure(signal_data, title):
                    xanchor="left", 
                    x=0
         ),
-       dragmode="select",
+       #dragmode="select",
        uirevision=title,
    )
     return fig

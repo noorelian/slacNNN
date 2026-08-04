@@ -32,7 +32,7 @@ from quench_config import (
 )
 # from utils.srf_waveforms import calculate_loaded_q, validate_quench_lisa
 from utils.srf_waveforms import convert_pv_name_plot_string
-from classification.logic import classify, QuenchStatus, QuenchData
+from classification.logic import classify, QuenchStatus, QuenchData, compute_suggestion
 from utils.label_helpers import normalize_label, display_label, checked_status, format_event_status, event_matches_label
 
 
@@ -57,6 +57,8 @@ def cached_years(path, mtime, cm, cav):
 @st.cache_data(show_spinner=False)
 def cached_events(path, mtime, cm, cav, year):
     with h5py.File(path, "r") as f:
+        # TODO: Revisit once this function is merged/combined with the other one 
+        # not sure yet whether we'll still need this find_event_groups call or if the merged version will handle it differently.
         events = find_event_groups(f, cm=cm, cav=cav, year=year)
         event_status = {}
         for event in events:
@@ -183,101 +185,17 @@ def show_event_status(event_path, current_status):
         st.warning("A specialist needs to inspect the cavity")
 
 
-def compute_suggestion(signal_data, frequency, saved_q_loaded):
-    """Compute the classification suggestion using the classify system written by Norah"""
 
-    # If there is no fault_waveform, we are unable to classify 
-    if "fault_waveform" not in signal_data:
-        return None
-
-    x_fault, y_fault = signal_data["fault_waveform"]    # Split the fault_waveform (time, amplitude) tuple into two separate arrays
-
-    # If the forward_power is missing, we can't run the classifier 
-    if "forward_power" not in signal_data:
-        return None
-    x_fwd, y_fwd = signal_data["forward_power"]     # Split the forward_power (time, amplitude) tuple into two separate arrays
-
-    # reverse_power may or may not exist, if missing assign none to the time and amplitude 
-    x_rev, y_rev = signal_data.get("reverse_power", (None, None))
-
-    try:
-        # Build the QuenchData object 
-        # Convert every array into float for safer math calculations 
-        quench_event = QuenchData(
-            fault_time=np.asarray(x_fault, dtype=float),    
-            fault_waveform=np.asarray(y_fault, dtype=float), 
-            forward_power=np.asarray(y_fwd, dtype=float),
-            forward_time=np.asarray(x_fwd, dtype=float),
-            reverse_power=np.asarray(y_rev, dtype=float) if y_rev is not None else np.array([]), # Reverse power amplitude if available, else an empty array
-            reverse_time=np.asarray(x_rev, dtype=float) if x_rev is not None else np.array([]), # Reverse time if available, else an empty array
-        )
-       
-        if frequency is not None:
-            # Convert frequency into numpy no matter what type of data it came in 
-            quench_event.frequency = float(np.asarray(frequency).flat[0])
-        if saved_q_loaded is not None:
-            # Convert saved_q_loaded into numpy no matter what type of data it came in 
-            quench_event.saved_q_loaded = float(np.asarray(saved_q_loaded).flat[0])
-
-        return classify(quench_event)  # Calls classify function which returns a QuenchStatus [real, false, other or cavoty off]
-    except Exception as e :
-        st.error(f"Classification suggestion has failed: {e}")
-        return None
-
-# ** Plot + magnifier **
+# ** Plot **
 def render_plot(signal_data, event_path):
-    """Draw the original plot next to a magnifier preview that is used to show the specific part selected to be zoomed into."""
-
+    """Draw the plot for the given event."""
     fig = build_figure(signal_data, title=convert_pv_name_plot_string(event_path))
 
-    st.caption("Drag a box on the plot to preview a zoomed-in view on the right side of the screen")
-
-    col_main, col_zoom = st.columns([2, 1])
-
-    with col_main:
-        select_event = st.plotly_chart(
-            fig,
-            use_container_width=False,
-            on_select="rerun",
-            selection_mode=("box",),
-            key=f"main_chart_{event_path}",
-        )
-
-    with col_zoom:
-        st.caption("🔍 Magnifier preview")
-
-        box_list = select_event.selection.get("box", []) if select_event else []
-        x_range, y_range = (None, None)
-        if box_list:
-            x_range, y_range = extract_box_range(box_list[0])
-
-        if x_range and y_range:
-            render_zoom_figure(fig, x_range, y_range, event_path)
-        else:
-            st.info("No selection yet. Drag a box on the plot to preview it here")
-
-   
-
-def render_zoom_figure(fig, x_range, y_range, event_path):
-    """Draw the zommed-in part next to the original plot."""
-    zoom_fig = go.Figure(fig)
-    zoom_fig.update_layout(
-        xaxis=dict(range=x_range, title=None),
-        yaxis=dict(range=y_range, title=None),
-        margin=dict(l=10, r=10, t=10, b=10),
-        width=260,
-        height=300,
-        showlegend=False,
-        title=None,
-        dragmode=False,
-        )
     st.plotly_chart(
-        zoom_fig,
+        fig,
         use_container_width=False,
-        config={"staticPlot": True},
-        key=f"zoom_chart_{event_path}",
+        key=f"main_chart_{event_path}",
     )
-
 
 # Printing the classification 
 def render_suggestion(suggestion):
@@ -367,7 +285,7 @@ def main():
 
     # ** Plot + magnifier **
     render_plot(signal_data, event_path)
-
+    
     # ** Labeling the waveform **
     st.subheader("Label this waveform")
     render_suggestion(suggestion)
@@ -381,4 +299,63 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+# ---------------------------------------------------------------------------
+# TODO: Magnifier tool — commented out
+# ---------------------------------------------------------------------------
+
+# def render_plot(signal_data, event_path):
+#     """Draw the original plot next to a magnifier preview that is used to show the specific part selected to be zoomed into."""
+
+#     fig = build_figure(signal_data, title=convert_pv_name_plot_string(event_path))
+
+#     st.caption("Drag a box on the plot to preview a zoomed-in view on the right side of the screen")
+
+#     col_main, col_zoom = st.columns([2, 1])
+
+#     with col_main:
+#         select_event = st.plotly_chart(
+#             fig,
+#             use_container_width=False,
+#             on_select="rerun",
+#             selection_mode=("box",),
+#             key=f"main_chart_{event_path}",
+#         )
+
+#     with col_zoom:
+#         st.caption("🔍 Magnifier preview")
+
+#         box_list = select_event.selection.get("box", []) if select_event else []
+#         x_range, y_range = (None, None)
+#         if box_list:
+#             x_range, y_range = extract_box_range(box_list[0])
+
+#         if x_range and y_range:
+#             render_zoom_figure(fig, x_range, y_range, event_path)
+#         else:
+#             st.info("No selection yet. Drag a box on the plot to preview it here")
+
+   
+
+# def render_zoom_figure(fig, x_range, y_range, event_path):
+#     """Draw the zommed-in part next to the original plot."""
+#     zoom_fig = go.Figure(fig)
+#     zoom_fig.update_layout(
+#         xaxis=dict(range=x_range, title=None),
+#         yaxis=dict(range=y_range, title=None),
+#         margin=dict(l=10, r=10, t=10, b=10),
+#         width=260,
+#         height=300,
+#         showlegend=False,
+#         title=None,
+#         dragmode=False,
+#         )
+#     st.plotly_chart(
+#         zoom_fig,
+#         use_container_width=False,
+#         config={"staticPlot": True},
+#         key=f"zoom_chart_{event_path}",
+#     )
 

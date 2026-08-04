@@ -26,6 +26,8 @@ class QuenchData:
     decay_reference: Optional[NDArray[np.float64]] = None
     frequency: float = 1300000000.0
     saved_q_loaded: float = 40000000.0
+    quench_classification: str = "real"
+    is_mp: bool = False
 
 
 @dataclass

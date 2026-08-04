@@ -1,3 +1,4 @@
+import os
 import h5py
 import numpy as np
 import pandas as pd
@@ -9,30 +10,36 @@ from pathlib import Path
 from utils.config import DATA_DIR, H5_GLOB, DataBundle, QuenchData
 
 
-# # Iterates through all HDF5 events to format a DataBundle with physically sorted pandas DataFrames for plotting
+# Iterates through all HDF5 events to compile metadata and format a DataBundle with physically sorted pandas DataFrames for plotting.
 def build_plotter_bundle() -> DataBundle:
     records = []
 
-    for event_id, filename, quench_data in load_quench_events(H5_GLOB):
+    # SPEED OPTIMIZATION: load_waveforms=False skips the heavy arrays!
+    for event_id, filename, quench_data in load_quench_events(
+        H5_GLOB, load_waveforms=False
+    ):
         cm, cav, timestamp_str = event_id.split("/")
 
-        dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+        # Parse the timestamp string format stored in the HDF5 file
+        dt = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
 
         records.append(
             {
-                "cm": cm,
+                "cm": cm.upper(),  # Force uppercase so pandas doesn't filter them out
                 "cav": cav,
                 "year": str(dt.year),
                 "month": str(dt.month),
                 "day": str(dt.day),
-                "classification": getattr(quench_data, "quench_classification", "real"),
-                "is_mp": False,
+                "classification": quench_data.quench_classification,
+                "is_real": quench_data.quench_classification == "real",
+                "is_mp": bool(quench_data.is_mp),
             }
         )
 
     events = pd.DataFrame(records)
     print(f"Loaded {len(events)} quench events from {H5_GLOB}")
 
+    # --- Physical ordering from the old script ---
     CM_ORDER = ["CM01", "CM02", "CM03", "CMH1", "CMH2"] + [
         f"CM{n:02d}" for n in range(4, 36)
     ]
@@ -52,16 +59,25 @@ def build_plotter_bundle() -> DataBundle:
 
 
 # Extracts datasets from a single HDF5 group into a QuenchData dataclass
-def extract_quench_data(group: h5py.Group) -> QuenchData:
+def extract_quench_data(group: h5py.Group, load_waveforms: bool = True) -> QuenchData:
     data_dict = {}
 
     for field in fields(QuenchData):
         if field.name in group:
+            if not load_waveforms:
+                continue  # Skip extracting heavy arrays
+
             item = group[field.name]
             if isinstance(item, h5py.Dataset):
                 data_dict[field.name] = item[()]
         elif field.name in group.attrs:
-            data_dict[field.name] = group.attrs[field.name]
+            val = group.attrs[field.name]
+
+            # Decode h5py byte strings into normal Python strings
+            if isinstance(val, bytes):
+                val = val.decode("utf-8")
+
+            data_dict[field.name] = val
 
     if "frequency" not in data_dict:
         if "FREQ" in group.attrs:
@@ -74,13 +90,13 @@ def extract_quench_data(group: h5py.Group) -> QuenchData:
     return QuenchData(**data_dict)
 
 
-# Loads and formats waveform data from an HDF5 file for easy plotting
-def load_event_waveform_data(
+# Loads and formats waveform data from an HDF5 file for easy UI plotting
+def get_ui_waveform_signals(
     file_path: str, event_path: str
 ) -> Tuple[Dict[str, Tuple[NDArray, NDArray]], float, float]:
     with h5py.File(file_path, "r") as f:
         group = f[event_path]
-        quench_data = extract_quench_data(group)  # type: ignore
+        quench_data = extract_quench_data(group, load_waveforms=True)  # type: ignore
 
     signal_data = {}
     signal_time_map = {
@@ -118,10 +134,14 @@ def load_event_waveform_data(
 
 # Traverses HDF5 files to extract and yield quench event datasets
 def load_quench_events(
-    file_pattern: str = "*.h5",
+    file_pattern: str = "*.h5", load_waveforms: bool = True
 ) -> Iterator[Tuple[str, str, QuenchData]]:
     folder = Path(DATA_DIR)
-    for h5_file in folder.glob(file_pattern):
+
+    # Strip absolute paths so pathlib's glob can read it
+    safe_pattern = os.path.basename(file_pattern)
+
+    for h5_file in folder.glob(safe_pattern):
         with h5py.File(h5_file, "r") as f:
             for cm_name, cm_group in f.items():
                 if not isinstance(cm_group, h5py.Group):
@@ -136,5 +156,7 @@ def load_quench_events(
                             continue
 
                         event_id = f"{cm_name}/{cav_name}/{timestamp}"
-                        quench_data = extract_quench_data(event_group)
+
+                        # Pass the flag down to the parser
+                        quench_data = extract_quench_data(event_group, load_waveforms)
                         yield (event_id, h5_file.name, quench_data)

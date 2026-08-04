@@ -1,7 +1,6 @@
 import glob
 import os
 
-import h5py  # type: ignore[import-untyped]
 import pandas as pd
 
 # The H5 files written by ``save_data_h5.py`` are the source of truth.
@@ -181,70 +180,6 @@ def _resolve_paths(source):
     if isinstance(source, (str, os.PathLike)):
         return [source]
     return list(source)
-
-
-def load_quench_events(source):
-    """Return a flat events DataFrame, one row per quench event with EVENT_COLS.
-
-    Source can be one of the following:
-          - a path to a single ``quench_data_L*.h5`` file
-          - a list/tuple of such paths
-          - a glob string like ``"quench_data_L*.h5"``
-    """
-    rows = []
-    for path in _resolve_paths(source):
-        with h5py.File(path, "r") as f:
-            for cm in f:  # "CM01"
-                for cav in f[cm]:  # "CAV1"
-                    for ts in f[cm][cav]:  # "YYYYMMDD_HHMMSS"
-                        attrs = f[cm][cav][ts].attrs
-                        rows.append(
-                            (
-                                f"{path}::{cm}/{cav}/{ts}",
-                                cm,
-                                cav,
-                                ts,
-                                ts[:4],
-                                ts[4:6],
-                                ts[6:8],
-                                bool(attrs.get("quench_classification", False)),
-                            )
-                        )
-    return pd.DataFrame(rows, columns=EVENT_COLS)
-
-
-def load_quench_waveforms(events, source):
-    """Return waveforms + attrs for the quenches in `events`.
-
-    Parameters: events : pd.DataFrame or pd.Series
-        A row, Series, or sub-DataFrame from ``load_quench_events``. Only
-        the ``cm``, ``cav``, ``date`` columns are used.
-    source : same value passed to ``load_quench_events`` to build `events`.
-
-    Returns: dict keyed by ``"CM01/CAV1/YYYYMMDD_HHMMSS"``.
-    """
-    if isinstance(events, pd.Series):
-        events = events.to_frame().T
-    wanted = set(zip(events["cm"], events["cav"], events["date"]))
-
-    out = {}
-    for path in _resolve_paths(source):
-        with h5py.File(path, "r") as f:
-            for cm in f:
-                if cm not in {w[0] for w in wanted}:
-                    continue
-                for cav in f[cm]:
-                    if (cm, cav) not in {(w[0], w[1]) for w in wanted}:
-                        continue
-                    for ts in f[cm][cav]:
-                        if (cm, cav, ts) not in wanted:
-                            continue
-                        g = f[cm][cav][ts]
-                        out[f"{cm}/{cav}/{ts}"] = {
-                            "datasets": {k: g[k][...] for k in g.keys()},
-                            "attrs": {k: g.attrs[k] for k in g.attrs.keys()},
-                        }
-    return out
 
 
 # ----------------------------------------------------------------------- #

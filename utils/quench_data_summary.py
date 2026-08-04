@@ -3,6 +3,8 @@ import os
 
 import h5py  # type: ignore[import-untyped]
 import pandas as pd
+import re
+from interface.quench_config import SIGNAL_TIME_MAP
 
 # The H5 files written by ``save_data_h5.py`` are the source of truth.
 
@@ -245,6 +247,49 @@ def load_quench_waveforms(events, source):
                             "attrs": {k: g.attrs[k] for k in g.attrs.keys()},
                         }
     return out
+
+def load_csv(path):
+    """
+    load the csv or txt files into pandas dataframe 
+
+    - csv files are read direclty 
+    - txt files are comma-seperated first, if that fails it fall back to whitespace-seperated 
+    - Otherwise, it throws an error 
+    """
+    if path.endswith('.csv'):
+        return pd.read_csv(path)
+    elif path.endswith('.txt'):
+        try:
+            return pd.read_csv(path)
+        except Exception:
+            return pd.read_csv(path, delim_whitespace=True)
+    else:
+        raise ValueError(f"Error with file type: {path}")
+
+
+def list_cryomodules(h5_file):
+    "This function is used for the events filter in the interface"
+    return sorted(k for k in h5_file.keys() if re.fullmatch(r"CM\d+", k))
+
+
+def list_cavities(h5_file, cm):
+    "This function is used for the events filter in the interface"
+    if cm not in h5_file:
+        return []
+    return sorted(k for k in h5_file[cm].keys() if re.fullmatch(r"CAV\d+", k))
+
+def list_years(h5_file, cm, cav):
+    "This function is used for the events filter in the interface"
+    years = set()
+    if cm in h5_file and cav in h5_file[cm]:
+        for name in h5_file[cm][cav].keys():
+            match = re.match (r"(\d{4})\d{4}_\d{6}", name)
+            if match:
+                years.add(match.group(1))
+    return sorted(years)
+
+def has_signal(group):
+    return bool(set(group.keys()) & set(SIGNAL_TIME_MAP.keys()))
 
 
 # ----------------------------------------------------------------------- #

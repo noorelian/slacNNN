@@ -1,3 +1,10 @@
+POWER_SIGNALS = {
+   "forward_power",
+   "reverse_power",
+}
+
+#MW_TO_KW = 1000.0
+HEADROOM =  1.30        # 30% white space above the peak
 
 SIGNAL_TIME_MAP = {
     "forward_power": "forward_time",
@@ -5,6 +12,7 @@ SIGNAL_TIME_MAP = {
     "fault_waveform": "fault_time",
     "decay_reference": "forward_time",  
 }
+
 # Styles for the plot
 STYLES = {
    'fault_waveform':  {'color': 'indigo', 'linestyle': '-',  'linewidth': 3, 'alpha': 1.0,
@@ -24,6 +32,20 @@ STYLES = {
 #fig, ax = plt.subplots(figsize=(7, 3.5))
 LINE_STYLES = {"-": "solid", "--": "dash", ":": "dot", "-.": "dashdot"}
 MARKERS = {"o": "circle", "x": "x", "s": "square", "^": "triangle-up", "d": "diamond"}
+
+LABEL_DEFINITIONS = [
+    ("REAL", "real"),
+    ("FALSE", "false"),
+    ("OTHER", "other"),
+    ("NOT SURE", "not_sure"),
+    ("Cavity Off", "cavity_off"),
+]
+
+LABEL_OPTIONS = ["All"] + [display for display, _ in LABEL_DEFINITIONS] + ["Unlabeled"] # For filters dropdown
+LABEL_BUTTONS = LABEL_DEFINITIONS # Labeling buttons 
+LABEL_DISPLAY_TO_STORED = {display: stored for display, stored in LABEL_DEFINITIONS} # For filter lookup
+LABEL_DISPLAY_TO_STORED["UNLABELED"] = ""
+
 
 # the attributes used for lableing the events 
 LABELS = "quench_labels" # REAL, FALSE OR OTHER 

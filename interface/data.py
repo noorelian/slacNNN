@@ -14,29 +14,6 @@ from constants import (
 )
 
 
-def get_scalar(group, keys):
-    """
-    This function is used for extracting a scalar value from the h5 file 
-
-    """
-    for key in keys:
-        if key in group:
-            try:
-                arr = np.asarray(group[keys])
-                return float(arr.flat[0]) if arr.shape else float(arr)
-            except Exception:
-                continue
-        if key in group.attrs:
-            try:
-                val = group.attrs[key]
-                if isinstance(val, bytes):
-                    val = val.decode()
-                return float(val)
-            except Exception:
-                continue
-    return None
-
-
 def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
     """
     A modified version of lisa's function
@@ -83,7 +60,11 @@ def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
             exponential_term = np.polyfit(time_data, log_ratio, 1)[0]
             loaded_q = (np.pi * frequency) / exponential_term
     except (FloatingPointError, ZeroDivisionError):
-        return {"is_real": None, "loaded_q": np.nan, "other_issue": "divide_by_zero_or_invalid_value"}
+        return {
+            "is_real": None,
+            "loaded_q": np.nan,
+            "other_issue": "divide_by_zero_or_invalid_value",
+        }
 
     thresh_for_quench = LOADED_Q_CHANGE_FOR_QUENCH * saved_q_loaded
     is_real = bool(loaded_q < thresh_for_quench)
@@ -91,11 +72,11 @@ def suggest_classification(time_data, fault_data, frequency, saved_q_loaded):
 
 
 def find_event_groups(hdf5_file):
-    """This function is for finding each event groups/identifiers (decay ref, forward power, fault waveform) for each cm/cav/date, used for plotting """
+    """This function is for finding each event groups/identifiers (decay ref, forward power, fault waveform) for each cm/cav/date, used for plotting"""
     events = []
 
     def visitor(name, obj):
-        """ This function is for exploring the h5 file structure"""
+        """This function is for exploring the h5 file structure"""
         if isinstance(obj, h5py.Group):
             keys = set(obj.keys())
             if keys & set(SIGNAL_TIME_MAP.keys()):
@@ -106,9 +87,13 @@ def find_event_groups(hdf5_file):
 
 
 def write_label(file_path, event_path, label, srf_note, needs_specialist):
-    """ writing the label, note and checked status to the hdf5 file for each event (cm/cav/date) """
-    note = srf_note.strip() if srf_note and srf_note.strip() else (
-        f"This event has been already checked and the waveform was labeled as {label.upper()}"
+    """writing the label, note and checked status to the hdf5 file for each event (cm/cav/date)"""
+    note = (
+        srf_note.strip()
+        if srf_note and srf_note.strip()
+        else (
+            f"This event has been already checked and the waveform was labeled as {label.upper()}"
+        )
     )
 
     with h5py.File(file_path, "a") as f:

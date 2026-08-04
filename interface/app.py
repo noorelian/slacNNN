@@ -4,15 +4,14 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 
-from constants import SIGNAL_TIME_MAP, FREQUENCY_KEYS, SAVED_Q_LOADED_KEYS
-from data import (
-    get_scalar,
+from interface.data import (
     suggest_classification,
     find_event_groups,
     write_label,
     parse_event_path,
 )
 from plotting import build_figure, extract_box_range
+from utils.h5_load_data import load_event_waveform_data
 
 st.set_page_config(page_title="Quench Labeler", layout="wide")
 st.title("Plot a Waveform/Quench")
@@ -24,7 +23,9 @@ def checked_status(event_path, event_status):
     status = event_status[event_path]
     event_name = parse_event_path(event_path)
     if status["checked"]:
-        return f"{event_name}   |   Checked: Yes    |   Label: {status['label'].upper()}"
+        return (
+            f"{event_name}   |   Checked: Yes    |   Label: {status['label'].upper()}"
+        )
     return f"{event_name}   |   Checked: No |   Label: unlabeled"
 
 
@@ -51,14 +52,16 @@ def format_event_status(event_path, status):
 
 
 # ** File Selection **
-selected_path = st.text_input("Enter the full HDF5 File Path", value="")    # Getting the HDF5 file path from the user 
+selected_path = st.text_input(
+    "Enter the full HDF5 File Path", value=""
+)  # Getting the HDF5 file path from the user
 
-# if nothing was entered, it will reask you to enter a path 
+# if nothing was entered, it will reask you to enter a path
 if not selected_path:
     st.info("Enter the full path to a HDF5 file above.")
     st.stop()
 
-# if entered something else otherthan a file path, it will give you an error message 
+# if entered something else otherthan a file path, it will give you an error message
 if not os.path.isfile(selected_path):
     st.error(f"File not found: {selected_path}")
     st.stop()
@@ -77,7 +80,9 @@ try:
                 "needs_specialist": bool(attrs.get("needs_specialist", False)),
             }
 except Exception as e:
-    st.error(f"Could not open file as HDF5: {e}")   # throw an exception if the file is not a valid HDF5 file and stop 
+    st.error(
+        f"Could not open file as HDF5: {e}"
+    )  # throw an exception if the file is not a valid HDF5 file and stop
     st.stop()
 
 # if no events were found, it will give you a warning message then close the file and stop
@@ -88,7 +93,10 @@ if not events:
 
 # ** Event selection **
 
-if "selected_event" in st.session_state and st.session_state["selected_event"] in events:
+if (
+    "selected_event" in st.session_state
+    and st.session_state["selected_event"] in events
+):
     default_index = events.index(st.session_state["selected_event"])
 else:
     default_index = 0
@@ -111,37 +119,22 @@ if current_status["needs_specialist"]:
 
 
 # ** Load waveform data for the selected event **
-with h5py.File(selected_path, "r") as f:
-    group = f[event_path]
-    signal_data = {}
-
-    for signal_name, time_name in SIGNAL_TIME_MAP.items():
-        if signal_name not in group:  # if an event is missing some signals like the very first ones in 2022 (they are missing the decay reference), skip the missing items 
-            continue
-
-        y = np.array(group[signal_name])    # load the signals into array 
-        x = None
-
-        if time_name in group:
-            t = np.array(group[time_name])  # load time data into array 
-            # only assign t to x if its shape matches that of y 
-            if t.shape[0] == y.shape[0]:
-                x = t
-
-        if x is None:
-            x = np.arange(y.shape[0])   # if no time is available, create an x-axis starts from 0 to the length of y 
-
-        signal_data[signal_name] = (x, y)   # store the loaded signal data 
-
-    frequency = get_scalar(group, FREQUENCY_KEYS)   #read cavity frequency 
-    saved_q_loaded = get_scalar(group, SAVED_Q_LOADED_KEYS) #read the saved loaded Q
+signal_data, frequency, saved_q_loaded = load_event_waveform_data(
+    selected_path, event_path
+)
 
 
 # ** Classification suggestion **
 
 suggestion = None
-if "fault_waveform" in signal_data and frequency is not None and saved_q_loaded is not None:
-    x_fault, y_fault = signal_data["fault_waveform"]    # get the fault waveform time and amplitude 
+if (
+    "fault_waveform" in signal_data
+    and frequency is not None
+    and saved_q_loaded is not None
+):
+    x_fault, y_fault = signal_data[
+        "fault_waveform"
+    ]  # get the fault waveform time and amplitude
     try:
         suggestion = suggest_classification(x_fault, y_fault, frequency, saved_q_loaded)
     except Exception as e:
@@ -152,7 +145,9 @@ if "fault_waveform" in signal_data and frequency is not None and saved_q_loaded 
 
 fig = build_figure(signal_data, title=parse_event_path(event_path))
 
-st.caption("Drag a box on the plot to preview a zoomed-in view on the right side of the screen")
+st.caption(
+    "Drag a box on the plot to preview a zoomed-in view on the right side of the screen"
+)
 
 col_main, col_zoom = st.columns([2, 1])
 
@@ -199,13 +194,21 @@ with col_zoom:
 
 st.subheader("Label this waveform")
 
-# Printing the classification 
+# Printing the classification
 if suggestion is not None:  # if the classification was computed
-    if suggestion["other_issue"] is not None and suggestion["is_real"] is None: #if failed, display a warning message 
-        st.warning(f"Could not provide a suggested classification ({suggestion['other_issue']})")
+    if (
+        suggestion["other_issue"] is not None and suggestion["is_real"] is None
+    ):  # if failed, display a warning message
+        st.warning(
+            f"Could not provide a suggested classification ({suggestion['other_issue']})"
+        )
     else:
         suggested_label = "REAL" if suggestion["is_real"] else "FALSE"
-        q_text = f"{suggestion['loaded_q']:.3e}" if np.isfinite(suggestion["loaded_q"]) else "N/A"
+        q_text = (
+            f"{suggestion['loaded_q']:.3e}"
+            if np.isfinite(suggestion["loaded_q"])
+            else "N/A"
+        )
         st.info(
             f"The system suggests that the given waveform is **{suggested_label}** "
             f"and the estimated loaded Q = {q_text}"
@@ -220,7 +223,7 @@ SRF_note = st.text_area(
     key=f"note_{event_path}",
 )
 
-# A checkbox if there is a need for a specialist to check the cvaity in person 
+# A checkbox if there is a need for a specialist to check the cvaity in person
 needs_specialist = st.checkbox(
     "Needs specialist to inpect the cavity in person",
     value=current_status["needs_specialist"],
@@ -238,19 +241,21 @@ with col1:
         clicked_option = "real"
 
 with col2:
-    # set clicked_option = false if "FALSE" was chosen 
+    # set clicked_option = false if "FALSE" was chosen
     if st.button("FALSE", use_container_width=True):
         clicked_option = "false"
 
 with col3:
-    # set the clicked_option = other if "OTHER" was chosen 
+    # set the clicked_option = other if "OTHER" was chosen
     if st.button("OTHER", use_container_width=True):
         clicked_option = "other"
 
-# if any option/button was clicked, update the label and the status of the event 
+# if any option/button was clicked, update the label and the status of the event
 if clicked_option:
     try:
-        write_label(selected_path, event_path, clicked_option, SRF_note, needs_specialist)
+        write_label(
+            selected_path, event_path, clicked_option, SRF_note, needs_specialist
+        )
         st.rerun()
     except Exception as e:
         st.error(f"Could not write label to file: {e}")

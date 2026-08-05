@@ -1,5 +1,8 @@
 import numpy as np
 import pandas as pd
+import re 
+from datetime import datetime
+from pathlib import Path
 
 # Partial PVs to search for various waveforms
 common_data = [
@@ -15,6 +18,8 @@ common_data = [
     # ('ACQ_SAMP_PERIOD', 'sampling_period'),
 ]
 
+from interface.quench_config import LOADED_Q_CHANGE_FOR_QUENCH
+
 waveform_data = [key for _, key in common_data]
 by_label = {label: pv for pv, label in common_data}
 
@@ -24,28 +29,60 @@ def all_arrays_same_length(dictionary):
     lengths = (len(arr) for arr in dictionary.values())
     return len(set(lengths)) == 1
 
+def parse_h5_event_path(raw_name):
+    try:
+        path = Path(raw_name).with_suffix("")
+        basefile = path.name
+        date_str, time_str = basefile.split("_")
+        cm, cav = get_cm_cav_num_from_pv(raw_name)
+        return cm, cav, date_str, time_str
+    except (IndexError, ValueError):
+        return None
 
 def convert_pv_name_plot_string(raw_name):
     """Make a cryomodule and cavity name for plots"""
+    # Case 1: h5 file path
+    parsed = parse_h5_event_path(raw_name)
+    if parsed:
+        cm, cav, date_str, time_str = parsed
+        try:
+            date = datetime.strptime(f"{date_str}_{time_str}", "%Y%m%d_%H%M%S")
+            formatted_date = date.strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            formatted_date = f"{date_str}_{time_str}"
+        return f"Cryomodule {cm}, Cavity {cav} |  {formatted_date}"
+    
+    # Case 2: PV name 
     cm, cav = get_cm_cav_num_from_pv(raw_name)
+
     if cm and cav:
-        formatted_name = f"L3B: cryomodule {cm}, cavity {cav}"
-        return formatted_name
-    else:
-        print(f"Warning: Could not parse PV name: {raw_name}")
-        return raw_name
+        return f"cryomodule {cm}, cavity {cav}" 
+         
+    print(f"Warning: Could not parse PV name: {raw_name}")
+    return raw_name
 
 
-def get_cm_cav_num_from_pv(pv_name):
-    """Get cryomodule and cavity number from PV."""
-    pv_parts = pv_name.split(":")
+def get_cm_cav_num_from_pv(name):
+    """Get cryomodule and cavity number from h5 file or PV."""
+    # Case 1: h5 file path (CM01/CAV1/20220630_150321)
+    if "/" in name or "\\" in name:
+        try:
+            parts = Path(name).parts
+            cm_num = parts[-3].replace("CM", "")
+            cav_num = parts[-2].replace("CAV", "")
+            return cm_num, cav_num
+        except Exception as e:
+            print(f"Error parsing h5 file path: {name}. Exception: {e}")
+            return None, None
+
+    # Case 2: PV name (ACCL:L3B:3180) 
+    pv_parts = name.split(":")
     try:
-        # Assumes PV format ACCL:L3B:3180
         cav_num = pv_parts[2][2]
         cm_num = pv_parts[2][:2]
         return cm_num, cav_num
     except Exception as e:
-        print(f"Error parsing PV name: {pv_name}. Exception: {e}")
+        print(f"Error parsing PV name: {name}. Exception: {e}")
         return None, None
 
 
@@ -121,21 +158,16 @@ def make_timestamp_string(basefile):
 
 
 def validate_quench_lisa(quench_data):
-    # This is as close to copy paste as possible from Lisa's function:
-    # def validate_quench(self, wait_for_update: bool = False):
     """
-    Parsing the fault waveforms to calculate the loaded Q to try to determine
-    if a quench was real.
-    DERIVATION NOTES
-    A(t) = A0 * e^((-2 * pi * cav_freq * t)/(2 * loaded_Q)) = A0 * e ^ ((-pi * cav_freq * t)/loaded_Q)
-    ln(A(t)) = ln(A0) + ln(e ^ ((-pi * cav_freq * t)/loaded_Q)) = ln(A0) - ((pi * cav_freq * t)/loaded_Q)
-    polyfit(t, ln(A(t)), 1) = [-((pi * cav_freq)/loaded_Q), ln(A0)]
-    polyfit(t, ln(A0/A(t)), 1) = [(pi * f * t)/Ql]
+     This function is responsible for suggesting whether an event is real or false, this is how it works:
+    - Trim the waveform to start at t = 0
+    - Trim the tail once the amplitude is < 0.002
+    - Fit ln(A0/A(t)) vs. time to a line; the slope gives the decay rate and loaded Q = (pi * frequency)/ slope
+    - Suggest Real if the loaded Q is < (LOADED_Q_CHANGE_FOR_QUENCH * saved_q_loaded), otherwise suggest False 
+   
     https://education.molssi.org/python-data-analysis/03-data-fitting/index.html
-    :param wait_for_update: bool
-    :return: bool representing whether quench was real
-    """
 
+    """
     LOADED_Q_CHANGE_FOR_QUENCH = 0.6
     other = None
 
@@ -205,3 +237,4 @@ def validate_quench_lisa(quench_data):
     thresh_for_quench = LOADED_Q_CHANGE_FOR_QUENCH * saved_loaded_q
     is_real = loaded_q < thresh_for_quench
     return {"is_real": is_real, "loaded_q": loaded_q, "other_issue": other}
+

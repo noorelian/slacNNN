@@ -6,6 +6,7 @@ from classification.logic import QuenchData, find_quench_time
 from numpy.typing import NDArray
 
 
+# Calculates the expected exponential decay curve after a quench event
 def calculate_decay_reference(qd: QuenchData) -> np.ndarray:
     idx_0 = find_quench_time(qd)
     decay_ref = np.zeros_like(qd.fault_time)
@@ -23,6 +24,7 @@ def calculate_decay_reference(qd: QuenchData) -> np.ndarray:
     return decay_ref
 
 
+# Scans HDF5 files and adds the missing decay_reference dataset to cavity events that are missing it
 def process_h5_files(search_pattern: str) -> None:
     h5_files = glob.glob(search_pattern, recursive=True)
     files_fixed_count = 0

@@ -1,3 +1,16 @@
+"""
+Script to fix missing quench data.
+
+This script automatically scans through all .h5 files in the local `data/`
+directory, identifies cavity events missing the `decay_reference` dataset,
+calculates the exponential decay curve, and permanently saves it.
+Events that already contain a `decay_reference` are automatically skipped.
+
+Usage:
+    Run this script from the root project directory using:
+    $ python -m utils.add_missing_decay_reference
+"""
+
 import h5py
 import glob
 import numpy as np

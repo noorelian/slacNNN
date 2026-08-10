@@ -2,7 +2,6 @@ import h5py
 import glob
 import numpy as np
 from pathlib import Path
-from typing import List
 from classification.logic import QuenchData, find_quench_time
 from numpy.typing import NDArray
 
@@ -24,34 +23,24 @@ def calculate_decay_reference(qd: QuenchData) -> np.ndarray:
     return decay_ref
 
 
-def scan_for_missing_decay(directory_path: str) -> List[str]:
-    files_to_fix = []
-
-    search_pattern = f"{directory_path}/**/quench_data_L[0-9].h5"  # File path of data to add decay reference
+def process_h5_files(search_pattern: str) -> None:
     h5_files = glob.glob(search_pattern, recursive=True)
+    files_fixed_count = 0
 
     for file_path in h5_files:
         try:
-            with h5py.File(file_path, "r") as h5_file:
-                needs_fix = False
-                for event_id in h5_file.keys():
-                    if "decay_reference" not in h5_file[event_id]:  # type: ignore
-                        needs_fix = True
-                        break
-
-                if needs_fix:
-                    files_to_fix.append(file_path)
-        except Exception:
-            print("Error")
-
-    return files_to_fix
-
-
-def fix_specific_files(file_list: List[str]) -> None:
-    for file_path in file_list:
-        try:
             with h5py.File(file_path, "r+") as h5_file:
-                for event_id in h5_file.keys():
+                event_paths = []
+
+                def collect_events(name, node):
+                    if isinstance(node, h5py.Group) and "fault_waveform" in node:
+                        event_paths.append(name)
+
+                h5_file.visititems(collect_events)
+
+                file_was_patched = False
+
+                for event_id in event_paths:
                     event_group = h5_file[event_id]
 
                     if "decay_reference" in event_group:  # type: ignore
@@ -90,21 +79,23 @@ def fix_specific_files(file_list: List[str]) -> None:
                     )
 
                     new_decay_ref = calculate_decay_reference(temp_qd)
-
                     event_group.create_dataset("decay_reference", data=new_decay_ref)  # type: ignore
 
+                    file_was_patched = True
+
+            if file_was_patched:
                 print(f"Fixed: {Path(file_path).name}")
+                files_fixed_count += 1
 
         except Exception as e:
             print(f"Failed to fix {Path(file_path).name}: {e}")
 
+    if files_fixed_count == 0:
+        print("All files already have decay_reference.")
+
 
 if __name__ == "__main__":
-    directory = "./data"
-
-    broken_files = scan_for_missing_decay(directory)
-
-    if broken_files:
-        fix_specific_files(broken_files)
-    else:
-        print("All files have decay_reference")
+    pattern = (
+        "./data/**/quench_data_L[0-9].h5"  # File path of data to add decay reference
+    )
+    process_h5_files(pattern)

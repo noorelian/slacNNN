@@ -76,6 +76,8 @@ The app opens in your browser automatically. If it doesn't, copy that **URL** fr
 3. Select an event to view its waveform and classification suggestion.
 4. Label the event using the buttons at the bottom.
 
+***Tip: When labeling, set the filter to "unlabeled". This way, once you label an event, the app automatically moves you to the next unlabeled one.***
+
 ---
 ## Troubleshooting: 
 | Problem | Fix |

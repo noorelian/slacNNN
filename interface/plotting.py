@@ -85,10 +85,7 @@ def build_figure(signal_data, title):
     """Build the full figure from the signals data."""
     fig = go.Figure()
     
-    ordered = sorted(
-       signal_data.items(),
-       key=lambda kv: 0 if kv[0] in POWER_SIGNALS else 1
-   )
+    ordered = sorted(signal_data.items(), key=lambda kv: kv[0] not in POWER_SIGNALS)
 
     mv_max =0
     kw_max =0

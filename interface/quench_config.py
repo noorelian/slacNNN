@@ -3,25 +3,28 @@ POWER_SIGNALS = {
    "reverse_power",
 }
 
-HEADROOM =  1.30        # 30% white space above the peak
+HEADROOM =  1.30 # 30% white space above the peak
+
+    
 
 SIGNAL_TIME_MAP = {
-    "forward_power": "forward_time",
-    "reverse_power": "reverse_time",
     "fault_waveform": "fault_time",
     "decay_reference": "forward_time",  
+    "forward_power": "forward_time",
+    "reverse_power": "reverse_time",
+    
 }
 
 # Styles for the plot
 STYLES = {
    'fault_waveform':  {'color': 'indigo', 'linestyle': '-',  'linewidth': 3, 'alpha': 1.0,
-                        'marker': None},                      
-    'forward_power':   {'color': 'green', 'linestyle': '-',  'linewidth': 2, 'alpha': 1.0,
-                        'marker': 'o', 'markersize': 6, 'markevery': 50},  
-    'reverse_power':   {'color': 'orange', 'linestyle': '-', 'linewidth': 2, 'alpha': 1.0,
-                        'marker': 'x', 'markersize': 6, 'markevery': 50},  
-    'decay_reference': {'color': 'darkcyan', 'linestyle': ':',  'linewidth': 3, 'alpha': 1.0,
                         'marker': None},                       
+    'decay_reference': {'color': 'darkcyan', 'linestyle': ':',  'linewidth': 3, 'alpha': 1.0,
+                        'marker': None},  
+    'forward_power':   {'color': 'green', 'linestyle': '-',  'linewidth': 2, 'alpha': 1.0,
+                                                'marker': 'o', 'markersize': 6, 'markevery': 50},  
+    'reverse_power':   {'color': 'orange', 'linestyle': '-', 'linewidth': 2, 'alpha': 0.8,
+                            'marker': 'x', 'markersize': 6, 'markevery': 50},                      
 }
 
 #fig, ax = plt.subplots(figsize=(7, 3.5))

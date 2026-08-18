@@ -54,28 +54,11 @@ def cached_years(path, mtime, cm, cav):
     with h5py.File(path, "r") as f:
         return list_years(f, cm, cav)
  
-"""
 @st.cache_data(show_spinner=False)
 def cached_events(path, mtime, cm, cav, year):
     with h5py.File(path, "r") as f:
         # TODO: Revisit once this function is merged/combined with the other one 
         # not sure yet whether we'll still need this find_event_groups call or if the merged version will handle it differently.
-        events = find_event_groups(f, cm=cm, cav=cav, year=year)
-        event_status = {}
-        for event in events:
-            attrs = f[event].attrs
-            event_status[event] = {
-                "checked": bool(attrs.get(CHECKED, False)),
-                "label": attrs.get(LABELS, None),
-                "note": attrs.get(NOTE, None),
-                "checked_at": attrs.get(CHECKED_AT, None),
-                "needs_specialist": bool(attrs.get(NEEDS_SPECIALIST, False)),
-            }
-    return events, event_status
-"""
-@st.cache_data(show_spinner=False)
-def cached_events(path, mtime, cm, cav, year):
-    with h5py.File(path, "r") as f:
         events = find_event_groups(f, cm=cm, cav=cav, year=year)
         event_status = {event: read_event_status(f[event]) for event in events}
     return events, event_status

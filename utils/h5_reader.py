@@ -2,7 +2,7 @@ from datetime import datetime
 import h5py
 import numpy as np
 
-from quench_config import (
+from interface.quench_config import (
     SIGNAL_TIME_MAP,
     LABELS,
     CHECKED,
@@ -16,7 +16,7 @@ from quench_config import (
 import re 
 
 
-# TODO: look at this function again later for combination options
+# TODO: look at again later for combination options
 def find_event_groups(hdf5_file, cm=None, cav=None, year=None):
     """This function is for finding each event groups/identifiers (decay ref, forward power, fault waveform) for each cm/cav/date, used for plotting """
     events = []
@@ -43,15 +43,13 @@ def find_event_groups(hdf5_file, cm=None, cav=None, year=None):
             if isinstance(obj, h5py.Group) and has_signal(obj):
                 if year and not name.split("/")[-1].startswith(year):
                     return
-                #keys = set(obj.keys())
-                #if keys & set(SIGNAL_TIME_MAP.keys()):
                 events.append(name)
 
         hdf5_file.visititems(visitor)
     return sorted(events)
 
 # ** Load waveform data for the selected event **
-#TODO look at older version of this
+# TODO: look if we still need this function after the combined load_data approach
 def load_signal_data(group):
     """Load signals data (decay_ref, fault_waveform, forward_power, reverse_power)."""
     signal_data = {}
@@ -167,7 +165,7 @@ def load_event_data_for_classification(path, event_path):
         saved_q_loaded = get_scalar(group, SAVED_Q_LOADED_KEYS) #read the saved loaded Q
     return signal_data, frequency, saved_q_loaded
 
-
+#TODO: we know the keys?
 def get_scalar(group, keys):
     """
     This function is used for extracting a single scalar value (frequency, saved Q) 
@@ -195,6 +193,18 @@ def get_scalar(group, keys):
                 continue
     return None
 
+def read_event_status(group):
+    """Read one event's labeling attrs (checked, label, note, checked_at,
+    needs_specialist) into a plain dict. Shared by app.py (to build the
+    dropdown/status table) and merge_labels.py (to compare labelers)."""
+    attrs = group.attrs
+    return {
+        "checked": bool(attrs.get(CHECKED, False)),
+        "label": attrs.get(LABELS, None),
+        "note": attrs.get(NOTE, None),
+        "checked_at": attrs.get(CHECKED_AT, None),
+        "needs_specialist": bool(attrs.get(NEEDS_SPECIALIST, False)),
+    }
 
 def write_label(file_path, event_path, label, srf_note, needs_specialist):
     """ writing the label, note and checked status to the hdf5 file for each event (cm/cav/date) """

@@ -27,7 +27,6 @@ STYLES = {
                             'marker': 'x', 'markersize': 6, 'markevery': 50},                      
 }
 
-#fig, ax = plt.subplots(figsize=(7, 3.5))
 LINE_STYLES = {"-": "solid", "--": "dash", ":": "dot", "-.": "dashdot"}
 MARKERS = {"o": "circle", "x": "x", "s": "square", "^": "triangle-up", "d": "diamond"}
 

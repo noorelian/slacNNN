@@ -12,6 +12,7 @@ from utils.h5_reader import (
     get_scalar,
     #suggest_classification,
     write_label,
+    read_event_status,
     #parse_event_path,
     find_event_groups,
     load_signal_data,
@@ -53,7 +54,7 @@ def cached_years(path, mtime, cm, cav):
     with h5py.File(path, "r") as f:
         return list_years(f, cm, cav)
  
- 
+"""
 @st.cache_data(show_spinner=False)
 def cached_events(path, mtime, cm, cav, year):
     with h5py.File(path, "r") as f:
@@ -70,6 +71,13 @@ def cached_events(path, mtime, cm, cav, year):
                 "checked_at": attrs.get(CHECKED_AT, None),
                 "needs_specialist": bool(attrs.get(NEEDS_SPECIALIST, False)),
             }
+    return events, event_status
+"""
+@st.cache_data(show_spinner=False)
+def cached_events(path, mtime, cm, cav, year):
+    with h5py.File(path, "r") as f:
+        events = find_event_groups(f, cm=cm, cav=cav, year=year)
+        event_status = {event: read_event_status(f[event]) for event in events}
     return events, event_status
 
 # ** File Selection **
